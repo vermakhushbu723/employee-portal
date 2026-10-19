@@ -4,13 +4,13 @@
 
 @section('title', 'Attendance')
 @section('back', route('employee.dashboard'))
-@if ($errors->has('reason') || $errors->has('type'))
+@if ($errors->has('type') || ($errors->has('reason') && $session))
     @section('reopen-modal', '#exceptionModal')
 @endif
 
 @section('content')
-<div class="row g-3 justify-content-center">
-    <div class="col-lg-6">
+<div class="row g-3">
+    <div class="col-lg-7">
         <div class="card-soft card-pad d-flex align-items-center justify-content-between mb-3">
             <span class="fw-600"><i class="bi bi-calendar-event me-2 text-muted"></i>Today, {{ now()->format('d M Y') }}</span>
             <a href="{{ route('employee.attendance.history') }}" class="btn-icon" aria-label="Attendance calendar"><i class="bi bi-calendar3"></i></a>
@@ -32,14 +32,11 @@
                 @endif
             </div>
         @else
-            <div class="checkin-card tone-primary mb-3">
-                <div class="big-icon"><i class="bi bi-fingerprint"></i></div>
+            <div class="checkin-card tone-{{ in_array($checkIn['state'], ['open', 'late_approved', 'not_open'], true) ? 'primary' : 'warning' }} mb-3">
+                <div class="big-icon"><i class="bi bi-{{ str_starts_with($checkIn['state'], 'late') ? 'alarm' : 'fingerprint' }}"></i></div>
                 <div class="h5 fw-bold">You have not checked in yet</div>
                 <p class="text-muted small mb-3">Shift starts at {{ \Illuminate\Support\Carbon::parse($shift->start_time)->format('h:i A') }}. Your working timer starts when you check in.</p>
-                <form method="POST" action="{{ route('employee.attendance.check-in') }}">
-                    @csrf
-                    <button class="btn btn-success btn-lg px-5"><i class="bi bi-box-arrow-in-right me-2"></i>Check In Now</button>
-                </form>
+                @include('employee.attendance.partials.checkin-action', ['checkIn' => $checkIn])
             </div>
         @endif
 

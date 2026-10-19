@@ -41,10 +41,9 @@
                 </small>
             </div>
             @unless ($timer['checked_in'])
-                <form method="POST" action="{{ route('employee.attendance.check-in') }}" class="ms-auto">
-                    @csrf
-                    <button class="btn btn-success btn-sm text-nowrap"><i class="bi bi-fingerprint me-1"></i>Check-in</button>
-                </form>
+                <div class="ms-auto text-end">
+                    @include('employee.attendance.partials.checkin-action', ['checkIn' => $checkIn, 'compact' => true])
+                </div>
             @endunless
         </div>
     </div>

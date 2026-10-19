@@ -81,8 +81,15 @@
 
                 <form method="POST" action="{{ route('employee.tasks.submit', $assignment) }}" data-confirm="Submit this work for verification?">
                     @csrf
-                    <button class="btn btn-outline-primary w-100"><i class="bi bi-send me-1"></i>Submit Work</button>
+                    <button class="btn btn-outline-primary w-100" @disabled($assignment->remaining() > 0)><i class="bi bi-send me-1"></i>Submit Work</button>
                 </form>
+                <div class="small text-muted mt-2">
+                    @if ($assignment->remaining() > 0)
+                        <i class="bi bi-lock-fill"></i> Complete the target ({{ $assignment->remaining() }} {{ $task->unit }} left) to submit. Every task must be completed before you can punch out.
+                    @else
+                        <i class="bi bi-check-circle-fill text-success"></i> Target met — submit to complete this task.
+                    @endif
+                </div>
             @else
                 <div class="info-box"><i class="bi bi-check-circle-fill"></i><div>Submitted on {{ $assignment->submitted_at?->format('d M Y, h:i A') }}. Waiting for verification.</div></div>
             @endif

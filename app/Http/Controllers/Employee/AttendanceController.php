@@ -23,6 +23,7 @@ class AttendanceController extends Controller
             'session' => $session,
             'timer' => $timer,
             'shift' => $user->currentShift(),
+            'checkIn' => $this->attendance->checkInState($user, $session),
             'timeline' => $this->timeline($session),
             'eligibility' => $this->attendance->checkoutEligibility($user, $session, $timer),
         ]);
@@ -33,6 +34,16 @@ class AttendanceController extends Controller
         $session = $this->attendance->checkIn($request->user(), $request->ip());
 
         return back()->with('success', 'Checked in at '.$session->check_in_at->format('h:i A').'. Your work timer has started.');
+    }
+
+    /** Late: ask admin for permission to check in. */
+    public function lateRequest(Request $request)
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:300']]);
+
+        $this->attendance->requestLateCheckIn($request->user(), $data['reason']);
+
+        return back()->with('success', 'Late check-in request sent to admin. You can check in once it is approved.');
     }
 
     public function checkOut(Request $request)

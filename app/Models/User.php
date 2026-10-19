@@ -63,6 +63,11 @@ class User extends Authenticatable
         return $this->hasMany(Target::class);
     }
 
+    public function lateCheckinRequests(): HasMany
+    {
+        return $this->hasMany(LateCheckinRequest::class);
+    }
+
     /* ---------------------------------------------------------------- Helpers */
 
     /** Users whose employee profile reports to this user. */

@@ -4,8 +4,8 @@
 @section('back', route('employee.leads.index'))
 
 @section('content')
-<div class="row justify-content-center">
-    <div class="col-lg-8 col-xl-7">
+<div class="row">
+    <div class="col-12">
         <form method="POST" action="{{ route('employee.leads.store') }}" class="card-soft card-pad" novalidate>
             @csrf
 

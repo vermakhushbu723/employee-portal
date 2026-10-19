@@ -50,9 +50,9 @@ return [
         ],
         'admin' => [
             ['route' => 'admin.dashboard', 'icon' => 'house-door', 'label' => 'Home'],
-            ['route' => 'admin.employees.index', 'active' => ['admin.employees.index'], 'icon' => 'person-badge', 'label' => 'Staff'],
+            ['route' => 'admin.employees.index', 'active' => ['admin.employees.index', 'admin.employees.edit'], 'icon' => 'person-badge', 'label' => 'Staff'],
             ['route' => 'admin.employees.create', 'icon' => 'person-plus', 'label' => 'Add Employee', 'fab' => true],
-            ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leaves'],
+            ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late'],
         ],
     ],
 
@@ -92,6 +92,7 @@ return [
             ['heading' => 'Administration'],
             ['route' => 'admin.dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
             ['route' => 'admin.employees.index', 'active' => 'admin.employees.*', 'icon' => 'person-badge', 'label' => 'Employees'],
+            ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late Check-in Requests'],
             ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leave Approvals'],
             ['heading' => 'Account'],
             ['route' => 'notifications.index', 'icon' => 'megaphone', 'label' => 'Announcements'],

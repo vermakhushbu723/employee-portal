@@ -49,6 +49,7 @@ Route::middleware(['auth', 'role:employee,team_leader'])
             Route::get('/', 'today')->name('today');
             Route::get('history', 'history')->name('history');
             Route::post('check-in', 'checkIn')->name('check-in');
+            Route::post('late-request', 'lateRequest')->name('late-request');
             Route::post('check-out', 'checkOut')->name('check-out');
             Route::post('exception-checkout', 'exceptionCheckout')->name('exception-checkout');
         });
@@ -127,7 +128,13 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::get('employees', [Admin\EmployeeController::class, 'index'])->name('employees.index');
         Route::get('employees/create', [Admin\EmployeeController::class, 'create'])->name('employees.create');
         Route::post('employees', [Admin\EmployeeController::class, 'store'])->name('employees.store');
+        Route::get('employees/{user}/edit', [Admin\EmployeeController::class, 'edit'])->whereNumber('user')->name('employees.edit');
+        Route::put('employees/{user}', [Admin\EmployeeController::class, 'update'])->whereNumber('user')->name('employees.update');
         Route::patch('employees/{user}/status', [Admin\EmployeeController::class, 'toggleStatus'])->whereNumber('user')->name('employees.status');
+
+        Route::get('late-requests', [Admin\LateCheckinController::class, 'index'])->name('late-requests.index');
+        Route::post('late-requests/{lateRequest}/approve', [Admin\LateCheckinController::class, 'approve'])->whereNumber('lateRequest')->name('late-requests.approve');
+        Route::post('late-requests/{lateRequest}/reject', [Admin\LateCheckinController::class, 'reject'])->whereNumber('lateRequest')->name('late-requests.reject');
 
         Route::get('leaves', [Admin\LeaveController::class, 'index'])->name('leaves.index');
         Route::post('leaves/{leave}/approve', [Admin\LeaveController::class, 'approve'])->whereNumber('leave')->name('leaves.approve');

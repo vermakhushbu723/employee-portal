@@ -6,8 +6,8 @@
 @section('back', route('employee.dashboard'))
 
 @section('content')
-<div class="row justify-content-center" data-live-timer='@json($timer)' data-status-url="{{ route('employee.work-timer.status') }}">
-    <div class="col-lg-8 col-xl-6">
+<div class="row g-3" data-live-timer='@json($timer)' data-status-url="{{ route('employee.work-timer.status') }}">
+    <div class="col-lg-6">
 
         <div class="card-soft card-pad text-center mb-3" style="background: var(--brand-soft)">
             <div class="text-muted small fw-600">Shift Ends In</div>
@@ -53,7 +53,9 @@
                 </div>
             </div>
         </div>
+    </div>
 
+    <div class="col-lg-6">
         <div class="card-soft card-pad mb-3">
             <div class="section-head">
                 <h3 class="section-title">Work Hour Progress</h3>

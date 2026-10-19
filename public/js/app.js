@@ -117,6 +117,14 @@
         sync();
     });
 
+    // Employee form: warn when an admin-portal role (HR / Super Admin) is chosen.
+    document.querySelectorAll('[data-role-warning]').forEach((select) => {
+        const warning = document.querySelector(select.dataset.roleWarning);
+        const sync = () => warning.classList.toggle('d-none', !['hr', 'super_admin'].includes(select.value));
+        select.addEventListener('change', sync);
+        sync();
+    });
+
     // Re-open a modal after a failed validation (server sets data-reopen-modal on <body>).
     const reopen = document.body.dataset.reopenModal;
     if (reopen && window.bootstrap) {

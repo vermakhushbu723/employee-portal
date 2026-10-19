@@ -31,6 +31,7 @@
                 </div>
                 <div class="text-end">
                     <x-badge :tone="$user->isActive() ? 'success' : 'secondary'">{{ ucfirst($user->status) }}</x-badge>
+                    <a href="{{ route('admin.employees.edit', $user) }}" class="btn btn-link btn-sm p-0 d-block mt-1">Edit</a>
                     @unless ($user->is(auth()->user()))
                         <form method="POST" action="{{ route('admin.employees.status', $user) }}" data-confirm="Change status of {{ $user->name }}?" class="mt-1">
                             @csrf
@@ -62,13 +63,17 @@
                                 </div>
                             </div>
                         </td>
-                        <td>{{ $user->role->label() }}</td>
+                        <td>
+                            {{ $user->role->label() }}
+                            <div class="small-xs text-muted">{{ ucfirst($user->role->portal()) }} portal</div>
+                        </td>
                         <td>{{ $user->employee?->department?->name ?? '—' }}</td>
                         <td>{{ $user->employee?->manager?->name ?? '—' }}</td>
                         <td><x-badge :tone="$user->isActive() ? 'success' : 'secondary'">{{ ucfirst($user->status) }}</x-badge></td>
-                        <td class="text-end">
+                        <td class="text-end text-nowrap">
+                            <a href="{{ route('admin.employees.edit', $user) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Edit</a>
                             @unless ($user->is(auth()->user()))
-                                <form method="POST" action="{{ route('admin.employees.status', $user) }}" data-confirm="Change status of {{ $user->name }}?">
+                                <form method="POST" action="{{ route('admin.employees.status', $user) }}" data-confirm="Change status of {{ $user->name }}?" class="d-inline">
                                     @csrf
                                     @method('PATCH')
                                     <button class="btn btn-sm {{ $user->isActive() ? 'btn-outline-danger' : 'btn-outline-success' }}">

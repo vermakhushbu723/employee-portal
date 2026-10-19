@@ -28,6 +28,7 @@ class DashboardController extends Controller
                 'on_leave' => LeaveRequest::where('status', LeaveStatus::Approved)
                     ->whereDate('from_date', '<=', today())->whereDate('to_date', '>=', today())->count(),
                 'pending_leaves' => LeaveRequest::where('status', LeaveStatus::Pending)->count(),
+                'pending_late' => \App\Models\LateCheckinRequest::where('status', LeaveStatus::Pending)->count(),
                 'leads_today' => Lead::whereDate('created_at', today())->count(),
                 'conversions_month' => Lead::where('converted_at', '>=', now()->startOfMonth())->count(),
             ],

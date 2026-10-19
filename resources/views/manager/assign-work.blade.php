@@ -67,7 +67,7 @@
             <div class="form-check form-switch">
                 <input type="hidden" name="is_mandatory" value="0">
                 <input class="form-check-input" type="checkbox" role="switch" id="is_mandatory" name="is_mandatory" value="1" @checked(old('is_mandatory'))>
-                <label class="form-check-label" for="is_mandatory">Mandatory — blocks normal checkout until submitted</label>
+                <label class="form-check-label" for="is_mandatory">Mark as mandatory (red marker). Note: every task must be completed before the employee can punch out.</label>
             </div>
         </div>
     </div>

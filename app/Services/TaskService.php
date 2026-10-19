@@ -64,9 +64,10 @@ class TaskService
     {
         $this->ensureEditable($assignment);
 
-        if ($assignment->task->is_mandatory && $assignment->remaining() > 0) {
+        // A task counts as completed only when its target is met.
+        if ($assignment->remaining() > 0) {
             throw ValidationException::withMessages([
-                'action' => "Mandatory target not met yet: {$assignment->remaining()} {$assignment->task->unit} remaining.",
+                'action' => "Target not met yet: {$assignment->remaining()} {$assignment->task->unit} remaining.",
             ]);
         }
 

@@ -3,8 +3,12 @@
 namespace App\Services;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\LeaveStatus;
+use App\Enums\Role;
 use App\Enums\TaskStatus;
+use App\Models\Announcement;
 use App\Models\AttendanceSession;
+use App\Models\LateCheckinRequest;
 use App\Models\User;
 use App\Support\Duration;
 use Carbon\CarbonInterface;
@@ -24,27 +28,148 @@ class AttendanceService
         return $user->attendanceSessions()->with('breaks')->whereDate('work_date', today())->first();
     }
 
-    public function checkIn(User $user, ?string $ip = null): AttendanceSession
+    public function lateRequestToday(User $user): ?LateCheckinRequest
     {
-        if ($this->todaySession($user)) {
-            throw ValidationException::withMessages(['action' => 'You have already checked in today.']);
+        return $user->lateCheckinRequests()->whereDate('work_date', today())->first();
+    }
+
+    /**
+     * Where the employee stands for today's check-in:
+     *   checked_in | not_open (before 09:55) | open (09:55–10:15)
+     *   late_request_needed | late_pending | late_rejected | late_approved
+     */
+    public function checkInState(User $user, ?AttendanceSession $session = null): array
+    {
+        $shift = $user->currentShift();
+        $opensAt = $shift->checkInOpensAt(today());
+        $lateAfter = $shift->lateAfter(today());
+        $request = null;
+        $now = now();
+
+        if ($session ?? $this->todaySession($user)) {
+            $state = 'checked_in';
+        } elseif ($now->lt($opensAt)) {
+            $state = 'not_open';
+        } elseif ($now->lte($lateAfter)) {
+            $state = 'open';
+        } else {
+            $request = $this->lateRequestToday($user);
+            $state = match ($request?->status) {
+                null => 'late_request_needed',
+                LeaveStatus::Pending => 'late_pending',
+                LeaveStatus::Rejected => 'late_rejected',
+                LeaveStatus::Approved => 'late_approved',
+            };
         }
 
-        $shift = $user->currentShift();
+        return [
+            'state' => $state,
+            'opens_at' => $opensAt->format('h:i A'),
+            'late_after' => $lateAfter->format('h:i A'),
+            'request' => $request,
+        ];
+    }
+
+    public function checkIn(User $user, ?string $ip = null): AttendanceSession
+    {
+        $check = $this->checkInState($user);
+
+        $error = match ($check['state']) {
+            'checked_in' => 'You have already checked in today.',
+            'not_open' => "Check-in opens at {$check['opens_at']}.",
+            'late_request_needed' => "You are late (check-in closed at {$check['late_after']}). Send a late check-in request to admin.",
+            'late_pending' => 'Your late check-in request is waiting for admin approval.',
+            'late_rejected' => 'Your late check-in request was rejected by admin.',
+            default => null,
+        };
+
+        if ($error) {
+            throw ValidationException::withMessages(['action' => $error]);
+        }
+
+        $isLate = $check['state'] === 'late_approved';
         $now = now();
-        $isLate = $now->gt($shift->startsAt(today())->addMinutes($shift->grace_minutes));
 
-        $session = $user->attendanceSessions()->create([
-            'work_date' => today()->toDateString(),
-            'check_in_at' => $now,
-            'status' => $isLate ? AttendanceStatus::Late : AttendanceStatus::Present,
-            'is_late' => $isLate,
-            'ip_address' => $ip,
-        ]);
+        $session = DB::transaction(function () use ($user, $ip, $isLate, $now, $check) {
+            $session = $user->attendanceSessions()->create([
+                'work_date' => today()->toDateString(),
+                'check_in_at' => $now,
+                'status' => $isLate ? AttendanceStatus::Late : AttendanceStatus::Present,
+                'is_late' => $isLate,
+                'ip_address' => $ip,
+            ]);
 
-        $this->audit->log('attendance.check_in', 'Checked in at '.$now->format('h:i A'), ['session_id' => $session->id], $user);
+            $check['request']?->update(['attendance_session_id' => $session->id]);
+
+            return $session;
+        });
+
+        $this->audit->log('attendance.check_in', 'Checked in at '.$now->format('h:i A').($isLate ? ' (late, approved)' : ''), ['session_id' => $session->id], $user);
 
         return $session;
+    }
+
+    /** After the on-time window an employee asks admin for permission to check in. */
+    public function requestLateCheckIn(User $user, string $reason): LateCheckinRequest
+    {
+        $check = $this->checkInState($user);
+
+        if ($check['state'] !== 'late_request_needed') {
+            throw ValidationException::withMessages(['action' => match ($check['state']) {
+                'open' => 'You are on time — just check in.',
+                'not_open' => "Check-in opens at {$check['opens_at']}.",
+                'checked_in' => 'You have already checked in today.',
+                default => 'A late check-in request for today already exists.',
+            }]);
+        }
+
+        return DB::transaction(function () use ($user, $reason) {
+            $request = $user->lateCheckinRequests()->create([
+                'work_date' => today()->toDateString(),
+                'reason' => $reason,
+                'status' => LeaveStatus::Pending,
+            ]);
+
+            // Let every admin / HR know.
+            User::whereIn('role', [Role::SuperAdmin->value, Role::Hr->value])->where('status', 'active')->pluck('id')
+                ->each(fn ($adminId) => Announcement::create([
+                    'user_id' => $adminId,
+                    'created_by' => $user->id,
+                    'type' => 'alert',
+                    'title' => 'Late Check-in Request',
+                    'body' => "{$user->name} ({$user->employee_code}) requested late check-in at ".now()->format('h:i A').": {$reason}",
+                ]));
+
+            $this->audit->log('attendance.late_request', 'Requested late check-in', ['request_id' => $request->id], $user);
+
+            return $request;
+        });
+    }
+
+    public function decideLateRequest(LateCheckinRequest $request, User $admin, bool $approve, ?string $reason = null): void
+    {
+        if ($request->status !== LeaveStatus::Pending) {
+            throw ValidationException::withMessages(['action' => 'This request has already been processed.']);
+        }
+
+        DB::transaction(function () use ($request, $admin, $approve, $reason) {
+            $request->update([
+                'status' => $approve ? LeaveStatus::Approved : LeaveStatus::Rejected,
+                'rejection_reason' => $approve ? null : $reason,
+                'actioned_by' => $admin->id,
+                'actioned_at' => now(),
+            ]);
+
+            Announcement::create([
+                'user_id' => $request->user_id,
+                'created_by' => $admin->id,
+                'type' => $approve ? 'general' : 'alert',
+                'title' => $approve ? 'Late Check-in Approved' : 'Late Check-in Rejected',
+                'body' => $approve ? 'Admin approved your late check-in. You can check in now.' : 'Your late check-in request was rejected'.($reason ? ": {$reason}" : '.'),
+            ]);
+
+            $this->audit->log($approve ? 'attendance.late_approve' : 'attendance.late_reject', ($approve ? 'Approved' : 'Rejected')." late check-in of {$request->user->employee_code}", ['request_id' => $request->id], $admin);
+        });
     }
 
     /** Everything the timer screens need, in seconds. Safe to return as JSON. */
@@ -93,7 +218,7 @@ class AttendanceService
         ];
     }
 
-    /** Rules 4–6: normal checkout needs full hours, no open break and no pending mandatory work. */
+    /** Rules 4–6: normal checkout needs full hours, no open break and every task of today completed. */
     public function checkoutEligibility(User $user, ?AttendanceSession $session, ?array $timer = null): array
     {
         if (! $session) {
@@ -115,18 +240,18 @@ class AttendanceService
             $reasons[] = 'Complete '.Duration::hm($timer['remaining']).' more of required work hours.';
         }
 
-        if (($pending = $this->pendingMandatoryTasks($user)) > 0) {
-            $reasons[] = "{$pending} mandatory task(s) are still pending.";
+        if (($pending = $this->pendingTasks($user)) > 0) {
+            $reasons[] = "{$pending} task(s) for today are not completed. Complete and submit every task to punch out.";
         }
 
         return ['allowed' => $reasons === [], 'reasons' => $reasons];
     }
 
-    public function pendingMandatoryTasks(User $user): int
+    /** Today's tasks that are not yet completed (submitted or verified). Any of them blocks punch-out. */
+    public function pendingTasks(User $user): int
     {
         return $user->taskAssignments()
             ->whereDate('assigned_date', today())
-            ->whereHas('task', fn ($q) => $q->where('is_mandatory', true))
             ->whereNotIn('status', [TaskStatus::Submitted->value, TaskStatus::Verified->value])
             ->count();
     }

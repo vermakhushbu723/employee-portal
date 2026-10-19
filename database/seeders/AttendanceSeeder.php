@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * About two months of attendance history plus today's live sessions:
- * EMP001 checked in at 09:30, EMP002 late at 09:42, EMP003 not yet in.
+ * EMP001 checked in at 10:00, EMP002 at 10:12, EMP003 not yet in.
  * Days with leave (approved or rejected) are skipped.
  */
 class AttendanceSeeder extends Seeder
@@ -34,7 +34,7 @@ class AttendanceSeeder extends Seeder
 
                 $halfDay = $n % 13 === 0;
                 $late = $n % 7 === 3;
-                $checkIn = $date->copy()->setTime(9, $late ? 45 + $n % 10 : 20 + $n % 10);
+                $checkIn = $date->copy()->setTime($late ? 10 : 9, $late ? 20 + $n % 10 : 55 + $n % 5);
                 $workedMinutes = $halfDay ? 255 : 480 + $n % 12;
                 $breakMinutes = 30;
 
@@ -49,7 +49,7 @@ class AttendanceSeeder extends Seeder
                     'checkout_type' => 'normal',
                 ]);
 
-                $breakStart = $date->copy()->setTime(13, 0);
+                $breakStart = $date->copy()->setTime(14, 0);
                 $session->breaks()->create([
                     'user_id' => $user->id,
                     'started_at' => $breakStart,
@@ -65,8 +65,8 @@ class AttendanceSeeder extends Seeder
     private function today(User $user, int $index): void
     {
         $checkIn = match ($index) {
-            0 => today()->setTime(9, 30),
-            1 => today()->setTime(9, 42),
+            0 => today()->setTime(10, 0),
+            1 => today()->setTime(10, 12),
             default => null,
         };
 
@@ -77,11 +77,11 @@ class AttendanceSeeder extends Seeder
         $session = $user->attendanceSessions()->create([
             'work_date' => today()->toDateString(),
             'check_in_at' => $checkIn,
-            'status' => $index === 1 ? AttendanceStatus::Late : AttendanceStatus::Present,
-            'is_late' => $index === 1,
+            'status' => AttendanceStatus::Present,
+            'is_late' => false,
         ]);
 
-        $breakStart = today()->setTime(11, 15);
+        $breakStart = today()->setTime(12, 15);
         if (now()->gte($breakStart->copy()->addMinutes(30))) {
             $session->breaks()->create([
                 'user_id' => $user->id,

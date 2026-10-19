@@ -4,8 +4,8 @@
 @section('back', route('home'))
 
 @section('content')
-<div class="row justify-content-center">
-    <div class="col-lg-8">
+<div class="row">
+    <div class="col-12">
         <div class="card-soft card-pad">
             @forelse ($announcements as $announcement)
                 @include('account.partials.announcement', ['announcement' => $announcement])

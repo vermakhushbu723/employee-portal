@@ -12,6 +12,10 @@
     <div class="col-6 col-lg-3"><x-stat-tile icon="trophy-fill" label="Conversions (Month)" tone="info" :value="$stats['conversions_month']" /></div>
     <div class="col-12 col-lg-6">
         <div class="card-soft card-pad h-100 d-flex flex-wrap gap-2 align-items-center">
+            <a href="{{ route('admin.late-requests.index') }}" class="btn {{ $stats['pending_late'] ? 'btn-warning' : 'btn-outline-primary' }}">
+                <i class="bi bi-alarm me-1"></i>Late Check-in Requests
+                @if ($stats['pending_late'])<span class="badge rounded-pill bg-danger ms-1">{{ $stats['pending_late'] }}</span>@endif
+            </a>
             <a href="{{ route('admin.employees.create') }}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
             <a href="{{ route('admin.leaves.index') }}" class="btn btn-outline-primary"><i class="bi bi-calendar2-check me-1"></i>Leave Approvals</a>
             <a href="{{ route('admin.employees.index') }}" class="btn btn-outline-primary"><i class="bi bi-person-badge me-1"></i>All Employees</a>

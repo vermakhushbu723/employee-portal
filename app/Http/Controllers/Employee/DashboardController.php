@@ -33,6 +33,7 @@ class DashboardController extends Controller
                 'progress' => Duration::percent($completed, $target),
             ],
             'eligibility' => $attendance->checkoutEligibility($user, $session, $timer),
+            'checkIn' => $attendance->checkInState($user, $session),
         ]);
     }
 }

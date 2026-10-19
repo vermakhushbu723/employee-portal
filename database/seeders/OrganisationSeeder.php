@@ -18,8 +18,8 @@ class OrganisationSeeder extends Seeder
         $admin = Department::create(['name' => 'Administration', 'code' => 'ADM']);
 
         $general = Shift::create([
-            'name' => 'General', 'start_time' => '09:30:00', 'end_time' => '18:30:00',
-            'required_minutes' => 480, 'break_allowed_minutes' => 60, 'grace_minutes' => 10, 'is_default' => true,
+            'name' => 'General', 'start_time' => '10:00:00', 'end_time' => '19:00:00',
+            'required_minutes' => 480, 'break_allowed_minutes' => 60, 'grace_minutes' => 15, 'checkin_opens_minutes' => 5, 'is_default' => true,
         ]);
         Shift::create([
             'name' => 'Morning', 'start_time' => '07:00:00', 'end_time' => '16:00:00',
