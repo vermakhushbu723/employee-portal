@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
+    <title>Offline · Employee Portal</title>
+    <style>
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #F7F2EA; color: #2B2B2B;
+               font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 24px; box-sizing: border-box; }
+        img { width: 200px; max-width: 70%; height: auto; margin-bottom: 16px; }
+        h1 { font-size: 1.3rem; margin: 0 0 8px; }
+        p { color: #7A746C; margin: 0 0 24px; line-height: 1.5; }
+        button { background: linear-gradient(135deg, #B85C3A, #F4A261); color: #fff; border: 0; border-radius: 12px; padding: 14px 28px; font-size: 1rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <main>
+        <img src="/images/logo.png" alt="Employee Portal">
+        <h1>You are offline</h1>
+        <p>Check your internet connection.<br>Your attendance timer keeps running on the server.</p>
+        <button type="button" onclick="location.reload()">Try Again</button>
+    </main>
+</body>
+</html>
