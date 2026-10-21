@@ -14,7 +14,9 @@
     <link href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}" rel="stylesheet">
     @stack('styles')
 </head>
-<body class="has-bottom-nav" data-reopen-modal="@yield('reopen-modal')">
+<body class="has-bottom-nav" data-reopen-modal="@yield('reopen-modal')"
+      data-pulse-url="{{ route('live.pulse') }}"
+      data-pulse-after="{{ \App\Models\Announcement::visibleTo(auth()->user())->max('id') ?? 0 }}">
     <div class="nav-progress" id="navProgress"></div>
 
     <div class="app-shell">
@@ -32,6 +34,9 @@
 
     @include('partials.bottom-nav')
     @include('partials.install-banner')
+
+    {{-- Real-time notifications (filled by public/js/app.js) --}}
+    <div class="toast-container live-toasts" id="liveToasts" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ asset('js/app.js') }}?v={{ filemtime(public_path('js/app.js')) }}"></script>

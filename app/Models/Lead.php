@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Lead extends Model
 {
     protected $fillable = [
-        'created_by', 'assigned_to', 'name', 'mobile', 'alternate_mobile', 'email', 'state', 'city',
+        'batch_id', 'created_by', 'assigned_to', 'assigned_by', 'assigned_at', 'name', 'mobile', 'alternate_mobile', 'email', 'state', 'city',
         'source', 'interest', 'remarks', 'status', 'follow_up_date', 'converted_at', 'created_at',
     ];
 
@@ -22,7 +22,18 @@ class Lead extends Model
             'status' => LeadStatus::class,
             'follow_up_date' => 'date',
             'converted_at' => 'datetime',
+            'assigned_at' => 'datetime',
         ];
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(LeadBatch::class, 'batch_id');
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     /** Leads an employee created or was assigned. */

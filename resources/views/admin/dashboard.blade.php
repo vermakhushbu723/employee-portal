@@ -16,6 +16,7 @@
                 <i class="bi bi-alarm me-1"></i>Late Check-in Requests
                 @if ($stats['pending_late'])<span class="badge rounded-pill bg-danger ms-1">{{ $stats['pending_late'] }}</span>@endif
             </a>
+            <a href="{{ route('admin.data.index') }}" class="btn btn-success"><i class="bi bi-cloud-arrow-up me-1"></i>Data Upload & Share</a>
             <a href="{{ route('admin.employees.create') }}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Add Employee</a>
             <a href="{{ route('admin.leaves.index') }}" class="btn btn-outline-primary"><i class="bi bi-calendar2-check me-1"></i>Leave Approvals</a>
             <a href="{{ route('admin.employees.index') }}" class="btn btn-outline-primary"><i class="bi bi-person-badge me-1"></i>All Employees</a>

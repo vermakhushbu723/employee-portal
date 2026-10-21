@@ -5,6 +5,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Employee;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LiveController;
 use App\Http\Controllers\Manager;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,7 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
 
     // Shared by every role
+    Route::get('live/pulse', [LiveController::class, 'pulse'])->name('live.pulse');
     Route::get('notifications', [AnnouncementController::class, 'index'])->name('notifications.index');
     Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
@@ -131,6 +133,16 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::get('employees/{user}/edit', [Admin\EmployeeController::class, 'edit'])->whereNumber('user')->name('employees.edit');
         Route::put('employees/{user}', [Admin\EmployeeController::class, 'update'])->whereNumber('user')->name('employees.update');
         Route::patch('employees/{user}/status', [Admin\EmployeeController::class, 'toggleStatus'])->whereNumber('user')->name('employees.status');
+
+        // Data upload & share (calling lists)
+        Route::controller(Admin\DataController::class)->prefix('data')->name('data.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('upload', 'upload')->name('upload');
+            Route::get('template', 'template')->name('template');
+            Route::post('share', 'share')->name('share');
+            Route::post('recall/{user}', 'recall')->whereNumber('user')->name('recall');
+            Route::get('batches/{batch}', 'show')->whereNumber('batch')->name('show');
+        });
 
         Route::get('late-requests', [Admin\LateCheckinController::class, 'index'])->name('late-requests.index');
         Route::post('late-requests/{lateRequest}/approve', [Admin\LateCheckinController::class, 'approve'])->whereNumber('lateRequest')->name('late-requests.approve');

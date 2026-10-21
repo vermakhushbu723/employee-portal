@@ -34,6 +34,7 @@ class DashboardController extends Controller
             ],
             'eligibility' => $attendance->checkoutEligibility($user, $session, $timer),
             'checkIn' => $attendance->checkInState($user, $session),
+            'newData' => \App\Models\Lead::where('assigned_to', $user->id)->whereNotNull('assigned_at')->where('status', 'new')->count(),
         ]);
     }
 }

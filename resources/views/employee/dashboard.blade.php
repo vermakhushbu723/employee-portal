@@ -48,6 +48,19 @@
         </div>
     </div>
 
+    <div data-live-region="leads">
+        @if ($newData > 0)
+            <a href="{{ route('employee.leads.index', ['tab' => 'new']) }}" class="status-banner tone-info mb-3 text-decoration-none">
+                <span class="dot"><i class="bi bi-stars small"></i></span>
+                <div>
+                    {{ $newData }} new lead(s) to call
+                    <small>Data shared by admin — open My Leads → New Data</small>
+                </div>
+                <span class="ms-auto btn btn-sm btn-primary text-nowrap">Start Calling</span>
+            </a>
+        @endif
+    </div>
+
     <div class="d-flex align-items-center gap-2 text-muted mb-3 small fw-600">
         <i class="bi bi-calendar3"></i> Today, {{ now()->format('d M Y') }}
     </div>

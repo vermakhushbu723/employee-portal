@@ -132,6 +132,105 @@
         if (el) bootstrap.Modal.getOrCreateInstance(el).show();
     }
 
+    /* ------------------------------------------------------------------ Real-time */
+    /*
+     * Every 10 s (and whenever the tab becomes visible) ask /live/pulse for
+     * new notifications and per-area versions. A changed version means that
+     * area's data changed: re-fetch the current page and swap only the
+     * [data-live-region="<area>"] blocks — no full refresh, no lost scroll.
+     */
+    const pulseUrl = document.body.dataset.pulseUrl;
+    if (pulseUrl) {
+        let after = Number(document.body.dataset.pulseAfter || 0);
+        let versions = null;
+        let timer = null;
+
+        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        const toast = (n) => {
+            const box = document.getElementById('liveToasts');
+            if (!box || !window.bootstrap) return;
+            const icon = { important: 'megaphone-fill', alert: 'exclamation-triangle-fill' }[n.type] || 'bell-fill';
+            const el = document.createElement('div');
+            el.className = 'toast live-toast';
+            el.setAttribute('role', 'status');
+            el.innerHTML = `<div class="toast-body d-flex gap-2 align-items-start">
+                <span class="icon-box sm tone-${n.type === 'alert' ? 'warning' : 'primary'}"><i class="bi bi-${icon}"></i></span>
+                <div class="flex-grow-1 min-w-0"><div class="fw-bold">${escapeHtml(n.title)}</div><div class="small text-muted">${escapeHtml(n.body)}</div></div>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+            box.appendChild(el);
+            el.addEventListener('hidden.bs.toast', () => el.remove());
+            bootstrap.Toast.getOrCreateInstance(el, { delay: 8000 }).show();
+        };
+
+        const setBell = (count) => {
+            const badge = document.getElementById('bellBadge');
+            if (!badge) return;
+            badge.textContent = count > 9 ? '9+' : count;
+            badge.classList.toggle('d-none', !count);
+        };
+
+        // Swap fresh copies of the live regions in; returns false if it had to wait.
+        const refreshRegion = async (key) => {
+            const regions = [...document.querySelectorAll(`[data-live-region="${key}"]`)];
+            if (!regions.length) return true;
+            const busy = document.querySelector('.modal.show, .dropdown-menu.show')
+                || regions.some((r) => r.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+            if (busy) return false;
+
+            const res = await fetch(location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            if (!res.ok) return true;
+            const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            const fresh = [...doc.querySelectorAll(`[data-live-region="${key}"]`)];
+            regions.forEach((region, i) => {
+                if (!fresh[i]) return;
+                region.replaceWith(fresh[i]);
+                fresh[i].classList.add('live-updated');
+                setTimeout(() => fresh[i].classList.remove('live-updated'), 1600);
+            });
+            return true;
+        };
+
+        const pulse = async () => {
+            if (document.hidden) return;
+            try {
+                const res = await fetch(`${pulseUrl}?after=${after}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                if (res.status === 401 || res.status === 419) { clearInterval(timer); return; }
+                if (!res.ok) return;
+                const data = await res.json();
+
+                setBell(data.alerts);
+                data.new.forEach((n) => { toast(n); after = Math.max(after, n.id); });
+                after = Math.max(after, data.latest_id || 0);
+
+                const next = { ...data.versions };
+                if (versions) {
+                    for (const [key, version] of Object.entries(data.versions)) {
+                        if (versions[key] !== version && !(await refreshRegion(key))) {
+                            next[key] = versions[key]; // busy: try again next tick
+                        }
+                    }
+                }
+                versions = next;
+            } catch (e) { /* offline: try again next tick */ }
+        };
+
+        setTimeout(pulse, 1500);
+        timer = setInterval(pulse, 10000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse(); });
+    }
+
+    // "Select all" link for checkbox groups: <a data-check-all="users[]">
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('[data-check-all]');
+        if (!link) return;
+        e.preventDefault();
+        const boxes = [...document.querySelectorAll(`input[type=checkbox][name="${link.dataset.checkAll}"]`)];
+        const check = boxes.some((b) => !b.checked);
+        boxes.forEach((b) => { b.checked = check; });
+        link.textContent = check ? 'Clear all' : 'Select all';
+    });
+
     /* ------------------------------------------------------------------ App (PWA) */
 
     if ('serviceWorker' in navigator) {

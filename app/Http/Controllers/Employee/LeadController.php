@@ -18,7 +18,7 @@ class LeadController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $tab = in_array($request->query('tab'), ['all', 'follow_up', 'converted'], true) ? $request->query('tab') : 'all';
+        $tab = in_array($request->query('tab'), ['all', 'new', 'follow_up', 'converted'], true) ? $request->query('tab') : 'all';
         $search = trim((string) $request->query('q'));
         $status = LeadStatus::tryFrom((string) $request->query('status'));
 
@@ -27,13 +27,20 @@ class LeadController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        // "New Data" = calling data shared by admin that has not been called yet
+        $sharedNew = fn ($q) => $q->where('assigned_to', $user->id)->whereNotNull('assigned_at')->where('status', LeadStatus::New->value);
+
         $leads = Lead::ownedBy($user)
-            ->when($tab !== 'all', fn ($q) => $q->where('status', $tab))
+            ->when($tab === 'new', $sharedNew)
+            ->when(! in_array($tab, ['all', 'new'], true), fn ($q) => $q->where('status', $tab))
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('mobile', 'like', "%{$search}%")
                 ->orWhere('city', 'like', "%{$search}%")))
+            // Newly shared data first, then latest
+            ->orderByRaw('case when status = ? and assigned_at is not null then 0 else 1 end', [LeadStatus::New->value])
+            ->orderByDesc('assigned_at')
             ->latest()
             ->paginate(12)
             ->withQueryString();
@@ -43,6 +50,7 @@ class LeadController extends Controller
             'tab' => $tab,
             'counts' => $counts,
             'total' => $counts->sum(),
+            'newData' => $sharedNew(Lead::query())->count(),
             'today' => Lead::ownedBy($user)->whereDate('created_at', today())->count(),
         ]);
     }

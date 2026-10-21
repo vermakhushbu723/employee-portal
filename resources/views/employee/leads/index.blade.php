@@ -10,9 +10,13 @@
     </div>
 @endif
 
+<div data-live-region="leads">
 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
     <nav class="seg-tabs flex-grow-1">
         <a href="{{ route('employee.leads.index') }}" @class(['active' => $tab === 'all'])>My Leads ({{ $total }})</a>
+        <a href="{{ route('employee.leads.index', ['tab' => 'new']) }}" @class(['active' => $tab === 'new'])>
+            New Data ({{ $newData }})
+        </a>
         <a href="{{ route('employee.leads.index', ['tab' => 'follow_up']) }}" @class(['active' => $tab === 'follow_up'])>Follow-up ({{ $counts['follow_up'] ?? 0 }})</a>
         <a href="{{ route('employee.leads.index', ['tab' => 'converted']) }}" @class(['active' => $tab === 'converted'])>Converted ({{ $counts['converted'] ?? 0 }})</a>
     </nav>
@@ -24,6 +28,7 @@
     <div class="col-6 col-md-3"><x-stat-tile icon="hand-thumbs-up" label="Interested" tone="success" :value="$counts['interested'] ?? 0" /></div>
     <div class="col-6 col-md-3"><x-stat-tile icon="telephone-forward" label="Follow-up" tone="warning" :value="$counts['follow_up'] ?? 0" /></div>
     <div class="col-6 col-md-3"><x-stat-tile icon="x-octagon" label="Invalid / Rejected" tone="danger" :value="($counts['invalid'] ?? 0) + ($counts['not_interested'] ?? 0)" /></div>
+</div>
 </div>
 
 <form method="GET" class="card-soft card-pad mb-3 d-flex flex-wrap gap-2">
@@ -41,22 +46,32 @@
     <button class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filter</button>
 </form>
 
-<div class="card-soft card-pad">
+<div class="card-soft card-pad" data-live-region="leads">
     @forelse ($leads as $lead)
+        @php $freshData = $lead->assigned_at && $lead->status === \App\Enums\LeadStatus::New; @endphp
         <div class="list-row">
             <a href="{{ route('employee.leads.show', $lead) }}" class="avatar tone-{{ $lead->status->tone() }}">{{ $lead->initials }}</a>
             <a href="{{ route('employee.leads.show', $lead) }}" class="flex-grow-1 min-w-0 list-row-link">
                 <div class="list-title text-truncate">{{ $lead->name }}</div>
                 <div class="small text-muted">+91 {{ $lead->mobile }}</div>
-                <div class="small text-muted"><i class="bi bi-geo-alt"></i> {{ $lead->city }}</div>
+                <div class="small text-muted"><i class="bi bi-geo-alt"></i> {{ $lead->city ?? '—' }} · {{ $lead->interest }}</div>
             </a>
+            @if ($freshData)
+                <a href="tel:+91{{ $lead->mobile }}" class="btn btn-sm btn-success" aria-label="Call {{ $lead->name }}"><i class="bi bi-telephone-fill"></i></a>
+            @endif
             <div class="text-end">
-                <x-badge :tone="$lead->status->tone()">{{ $lead->status->label() }}</x-badge>
+                @if ($freshData)
+                    <x-badge tone="info"><i class="bi bi-stars"></i> New Data</x-badge>
+                @else
+                    <x-badge :tone="$lead->status->tone()">{{ $lead->status->label() }}</x-badge>
+                @endif
                 <div class="small-xs text-muted mt-1">
                     @if ($lead->status === \App\Enums\LeadStatus::FollowUp && $lead->follow_up_date)
                         Follow-up<br><b>{{ $lead->follow_up_date->format('d M Y') }}</b>
                     @elseif ($lead->converted_at)
                         Converted On<br><b>{{ $lead->converted_at->format('d M Y') }}</b>
+                    @elseif ($freshData)
+                        Shared<br><b>{{ $lead->assigned_at->format('d M, h:i A') }}</b>
                     @else
                         Updated<br><b>{{ $lead->updated_at->format('d M Y') }}</b>
                     @endif

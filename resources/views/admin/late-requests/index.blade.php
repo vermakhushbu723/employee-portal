@@ -17,7 +17,7 @@
     <div>Employees can check in on time between the shift's check-in window (e.g. 09:55 – 10:15 AM). After that they must send a request here; once approved they can check in and the day is marked <b>Late</b>.</div>
 </div>
 
-<div class="card-soft card-pad">
+<div class="card-soft card-pad" data-live-region="late">
     @forelse ($requests as $req)
         <div class="list-row flex-wrap">
             <span class="avatar tone-{{ $req->status->tone() }}">{{ $req->user->initials }}</span>

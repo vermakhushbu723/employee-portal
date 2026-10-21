@@ -14,11 +14,9 @@
     <h1 class="topbar-title topbar-title-center d-lg-none">@yield('title', 'Dashboard')</h1>
 
     <div class="topbar-end">
-        <a href="{{ route('notifications.index') }}" class="btn-icon position-relative" aria-label="Announcements">
+        <a href="{{ route('notifications.index') }}" class="btn-icon position-relative" aria-label="Announcements" id="bellLink">
             <i class="bi bi-bell"></i>
-            @if ($alertCount > 0)
-                <span class="topbar-badge">{{ $alertCount > 9 ? '9+' : $alertCount }}</span>
-            @endif
+            <span class="topbar-badge {{ $alertCount > 0 ? '' : 'd-none' }}" id="bellBadge">{{ $alertCount > 9 ? '9+' : $alertCount }}</span>
         </a>
 
         <div class="dropdown">
