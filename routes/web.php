@@ -24,6 +24,9 @@ Route::middleware('guest')->group(function () {
     Route::view('forgot-password', 'auth.forgot-password')->name('password.request');
 });
 
+// Public "Install the app" page — share this link with employees.
+Route::view('install', 'install')->name('install');
+
 Route::middleware('auth')->group(function () {
     Route::get('/', HomeController::class)->name('home');
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');

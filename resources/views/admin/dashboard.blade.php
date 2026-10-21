@@ -24,6 +24,24 @@
     </div>
 </div>
 
+@php
+    $installUrl = url('/install');
+    $whatsAppText = "Install our Employee Portal app on your phone: {$installUrl}";
+@endphp
+<div class="card-soft card-pad mb-3 d-flex flex-wrap align-items-center gap-3">
+    <span class="icon-box lg tone-success"><i class="bi bi-phone"></i></span>
+    <div class="flex-grow-1 min-w-0">
+        <div class="fw-bold">App install link for employees</div>
+        <div class="small text-muted">Send this link — it opens a page with an <b>Install App</b> button (Android/Chrome) and steps for iPhone.</div>
+        <code class="small">{{ $installUrl }}</code>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-primary btn-sm" data-copy="{{ $installUrl }}"><i class="bi bi-clipboard"></i> Copy link</button>
+        <a href="https://wa.me/?text={{ rawurlencode($whatsAppText) }}" target="_blank" rel="noopener" class="btn btn-success btn-sm"><i class="bi bi-whatsapp"></i> Share on WhatsApp</a>
+        <a href="{{ $installUrl }}" target="_blank" rel="noopener" class="btn btn-light btn-sm">Open</a>
+    </div>
+</div>
+
 <div class="card-soft">
     <div class="card-pad pb-2"><h3 class="section-title">Recent Activity (Audit Log)</h3></div>
     <div class="table-responsive">

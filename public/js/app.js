@@ -233,9 +233,7 @@
 
     /* ------------------------------------------------------------------ App (PWA) */
 
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
-    }
+    // (The service worker is registered early in partials/pwa-head.)
 
     // Loading bar while the next page loads (feels like an app screen change).
     const progress = document.getElementById('navProgress');
@@ -250,26 +248,42 @@
     document.addEventListener('submit', (e) => { if (!e.defaultPrevented) startProgress(); });
     window.addEventListener('pageshow', () => progress && progress.classList.remove('active'));
 
-    // "Install app" banner: Android/Chrome uses the native prompt, iPhone gets instructions.
-    const banner = document.getElementById('installBanner');
+    /* ------------------------------------------------------------------ Install app */
+    /*
+     * Chrome's install prompt is captured early in partials/pwa-head (window.__installPrompt).
+     * - Banner: shown on every new visit until the app is installed ("×" hides it for this visit only).
+     * - /install page: big Install button, or step-by-step help where Chrome can't prompt (iPhone, etc.).
+     */
     const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-    const dismissedKey = 'installBannerDismissedAt';
-    const recentlyDismissed = () => {
-        try { return Date.now() - Number(localStorage.getItem(dismissedKey) || 0) < 3 * 24 * 3600 * 1000; } catch (e) { return false; }
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const banner = document.getElementById('installBanner');
+    const installPage = document.getElementById('installPage');
+
+    const runPrompt = async () => {
+        const prompt = window.__installPrompt;
+        if (!prompt) return false;
+        prompt.prompt();
+        const choice = await prompt.userChoice;
+        window.__installPrompt = null;
+        return choice.outcome === 'accepted';
     };
 
-    if (banner && !standalone && !recentlyDismissed()) {
-        let deferredPrompt = null;
-        const show = () => banner.classList.remove('d-none');
+    // Already installed on this phone? (Chrome Android, via manifest related_applications)
+    const checkInstalled = async () => {
+        try {
+            if (navigator.getInstalledRelatedApps) return (await navigator.getInstalledRelatedApps()).length > 0;
+        } catch (e) { /* not supported */ }
+        return false;
+    };
+
+    if (banner && !standalone && !installPage) {
+        const dismissedThisVisit = () => { try { return sessionStorage.getItem('installBannerHidden') === '1'; } catch (e) { return false; } };
+        const show = () => { if (!dismissedThisVisit()) banner.classList.remove('d-none'); };
         const hide = () => banner.classList.add('d-none');
 
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            show();
-        });
+        if (window.__installPrompt) show();
+        document.addEventListener('installable', show);
 
-        const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
         if (isIos) {
             banner.querySelector('[data-install-text]').innerHTML = 'Tap <i class="bi bi-box-arrow-up"></i> Share, then <b>Add to Home Screen</b>.';
             banner.querySelector('[data-install-accept]').classList.add('d-none');
@@ -277,18 +291,47 @@
         }
 
         banner.querySelector('[data-install-accept]').addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            deferredPrompt.prompt();
-            await deferredPrompt.userChoice;
-            deferredPrompt = null;
-            hide();
+            if (await runPrompt()) hide();
+            else if (!window.__installPrompt) location.href = '/install';
         });
-
         banner.querySelector('[data-install-dismiss]').addEventListener('click', () => {
-            try { localStorage.setItem(dismissedKey, String(Date.now())); } catch (e) { /* storage blocked */ }
+            try { sessionStorage.setItem('installBannerHidden', '1'); } catch (e) { /* storage blocked */ }
             hide();
         });
-
         window.addEventListener('appinstalled', hide);
+        checkInstalled().then((installed) => installed && hide());
     }
+
+    if (installPage) {
+        const states = [...installPage.querySelectorAll('[data-install-state]')];
+        const showState = (name) => states.forEach((el) => el.classList.toggle('d-none', el.dataset.installState !== name));
+
+        const decide = async () => {
+            if (standalone) return showState('opened');
+            if (await checkInstalled()) return showState('installed');
+            if (window.__installPrompt) return showState('ready');
+            if (isIos) return showState('ios');
+            showState('manual');
+        };
+
+        // Chrome may take a moment to decide the site is installable
+        showState('checking');
+        document.addEventListener('installable', decide);
+        setTimeout(decide, 1800);
+
+        installPage.querySelectorAll('[data-install-accept]').forEach((btn) => btn.addEventListener('click', async () => {
+            if (await runPrompt()) showState('done');
+        }));
+        window.addEventListener('appinstalled', () => showState('done'));
+    }
+
+    // Copy-to-clipboard buttons: <button data-copy="text">
+    document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(btn.dataset.copy);
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2"></i> Copied';
+            setTimeout(() => { btn.innerHTML = original; }, 2000);
+        } catch (e) { window.prompt('Copy this link:', btn.dataset.copy); }
+    }));
 })();

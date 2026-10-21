@@ -6,7 +6,7 @@
  *    so the app shell opens instantly.
  * Bump VERSION when changing this file.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `portal-${VERSION}`;
 const PRECACHE = ['/offline.html', '/images/logo.png', '/icons/icon-192.png', '/manifest.webmanifest'];
 
