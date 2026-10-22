@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** One uploaded calling-data file. */
 class LeadBatch extends Model
 {
-    protected $fillable = ['name', 'file_name', 'uploaded_by', 'total_rows', 'imported', 'duplicates', 'invalid'];
+    protected $fillable = ['name', 'file_name', 'columns', 'uploaded_by', 'total_rows', 'imported', 'duplicates', 'invalid'];
+
+    protected function casts(): array
+    {
+        return ['columns' => 'array'];
+    }
 
     public function leads(): HasMany
     {

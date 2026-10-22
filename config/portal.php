@@ -93,6 +93,7 @@ return [
             ['route' => 'admin.dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
             ['route' => 'admin.employees.index', 'active' => 'admin.employees.*', 'icon' => 'person-badge', 'label' => 'Employees'],
             ['route' => 'admin.data.index', 'active' => 'admin.data.*', 'icon' => 'cloud-arrow-up', 'label' => 'Data Upload & Share'],
+            ['route' => 'admin.leads.interested', 'icon' => 'hand-thumbs-up', 'label' => 'Interested Leads'],
             ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late Check-in Requests'],
             ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leave Approvals'],
             ['heading' => 'Account'],

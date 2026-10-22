@@ -7,6 +7,7 @@ use App\Models\Announcement;
 use App\Models\LateCheckinRequest;
 use App\Models\Lead;
 use App\Models\LeadBatch;
+use App\Services\AttendanceService;
 use Illuminate\Http\Request;
 
 /**
@@ -27,12 +28,22 @@ class LiveController extends Controller
 
         if ($user->role->portal() === 'employee') {
             $mine = Lead::ownedBy($user);
-            $versions['leads'] = md5((clone $mine)->count().'|'.(clone $mine)->max('updated_at'));
+            $versions['leads'] = md5((clone $mine)->count().'|'.(clone $mine)->max('updated_at').'|'
+                .(clone $mine)->selectRaw('status, count(*) c')->groupBy('status')->toBase()->get()->map(fn ($r) => $r->status.$r->c)->implode(','));
+
+            // Punch-in popup: changes when the window opens/closes or admin decides a late request
+            $attendance = app(AttendanceService::class);
+            $versions['punch'] = $attendance->mustPunchIn($user)
+                ? md5(json_encode([$attendance->checkInState($user)['state'], $attendance->lateRequestToday($user)?->status?->value]))
+                : 'in';
         }
 
         if ($user->role->portal() === 'admin') {
             $uploaded = Lead::whereNotNull('batch_id');
-            $versions['data'] = md5((clone $uploaded)->count().'|'.(clone $uploaded)->max('updated_at').'|'.LeadBatch::max('id'));
+            // Status counts are part of the version so a change in the same second is still noticed
+            $versions['data'] = md5((clone $uploaded)->count().'|'.(clone $uploaded)->max('updated_at').'|'.LeadBatch::max('id').'|'
+                .(clone $uploaded)->whereNotNull('assigned_to')->count().'|'.(clone $uploaded)->where('status', '!=', 'new')->count());
+            $versions['allleads'] = md5(Lead::count().'|'.Lead::max('updated_at').'|'.Lead::where('status', 'interested')->count());
             $versions['late'] = md5(LateCheckinRequest::where('status', LeaveStatus::Pending)->count().'|'.LateCheckinRequest::max('updated_at'));
         }
 

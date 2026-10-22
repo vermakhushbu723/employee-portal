@@ -18,6 +18,7 @@ class TeamMonitorService
             ->get()
             ->map(function (User $member) {
                 $timer = $this->attendance->timer($member, $member->attendanceSessions->first());
+                $timer['active'] = (int) $member->attendanceSessions->first()?->active_seconds;
 
                 $state = match (true) {
                     ! $timer['checked_in'] => 'not_checked_in',

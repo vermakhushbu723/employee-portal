@@ -34,6 +34,7 @@
 
     @include('partials.bottom-nav')
     @include('partials.install-banner')
+    @include('partials.punch-gate')
 
     {{-- Real-time notifications (filled by public/js/app.js) --}}
     <div class="toast-container live-toasts" id="liveToasts" aria-live="polite"></div>

@@ -60,7 +60,7 @@
         <div class="{{ $compact ? 'small' : '' }}">
             <x-badge tone="warning"><i class="bi bi-hourglass-split"></i> Waiting for admin approval</x-badge>
             @unless ($compact)
-                <div class="small text-muted mt-2">Requested at {{ $request->created_at->format('h:i A') }} · "{{ $request->reason }}"<br>Refresh this page after admin approves.</div>
+                <div class="small text-muted mt-2">Requested at {{ $request->created_at->format('h:i A') }} · "{{ $request->reason }}"<br>This screen updates by itself as soon as admin approves.</div>
             @endunless
         </div>
         @break

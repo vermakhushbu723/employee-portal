@@ -44,10 +44,13 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:employee,team_leader'])
+Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
     ->prefix('employee')->name('employee.')
     ->group(function () {
         Route::get('dashboard', Employee\DashboardController::class)->name('dashboard');
+
+        // Active-time heartbeat (navbar timer)
+        Route::post('activity/heartbeat', Employee\ActivityController::class)->name('activity.heartbeat');
 
         // Check-in / Attendance + My Attendance calendar
         Route::controller(Employee\AttendanceController::class)->prefix('attendance')->name('attendance.')->group(function () {
@@ -136,6 +139,8 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::get('employees/{user}/edit', [Admin\EmployeeController::class, 'edit'])->whereNumber('user')->name('employees.edit');
         Route::put('employees/{user}', [Admin\EmployeeController::class, 'update'])->whereNumber('user')->name('employees.update');
         Route::patch('employees/{user}/status', [Admin\EmployeeController::class, 'toggleStatus'])->whereNumber('user')->name('employees.status');
+
+        Route::get('interested-leads', Admin\InterestedLeadController::class)->name('leads.interested');
 
         // Data upload & share (calling lists)
         Route::controller(Admin\DataController::class)->prefix('data')->name('data.')->group(function () {

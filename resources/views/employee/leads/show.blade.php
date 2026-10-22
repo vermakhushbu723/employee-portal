@@ -36,6 +36,15 @@
     </div>
 
     <div class="col-lg-7">
+        @if ($lead->extra)
+            <div class="card-soft card-pad mb-3">
+                <h3 class="section-title mb-2"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Customer Details (from data file)</h3>
+                @foreach ($lead->extra as $field => $value)
+                    <div class="kv-row"><span class="k">{{ $field }}</span><span class="v text-break">{{ $value }}</span></div>
+                @endforeach
+            </div>
+        @endif
+
         @if ($lead->remarks)
             <div class="card-soft card-pad mb-3">
                 <h3 class="section-title mb-2">Remarks</h3>

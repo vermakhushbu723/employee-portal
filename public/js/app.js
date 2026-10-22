@@ -171,12 +171,12 @@
         };
 
         // Swap fresh copies of the live regions in; returns false if it had to wait.
-        const refreshRegion = async (key) => {
+        const refreshRegion = async (key, force = false) => {
             const regions = [...document.querySelectorAll(`[data-live-region="${key}"]`)];
             if (!regions.length) return true;
             const busy = document.querySelector('.modal.show, .dropdown-menu.show')
                 || regions.some((r) => r.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
-            if (busy) return false;
+            if (busy && !force) return false;
 
             const res = await fetch(location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
             if (!res.ok) return true;
@@ -218,7 +218,106 @@
         setTimeout(pulse, 1500);
         timer = setInterval(pulse, 10000);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse(); });
+
+        window.liveRefresh = refreshRegion;
+        window.liveToast = toast;
     }
+
+    const csrf = () => document.querySelector('meta[name=csrf-token]')?.content;
+
+    /* ------------------------------------------------------------------ Inline lead status */
+    // Changing the dropdown saves at once; "Follow-up" first asks for a date. The list then refreshes,
+    // so the lead moves to the tab of its new status.
+    const saveStatus = async (form) => {
+        const row = form.closest('.lead-row');
+        const body = new FormData(form);
+        body.append('_method', 'PATCH');
+        body.append('_token', csrf());
+        row?.classList.add('saving');
+        try {
+            const res = await fetch(form.action, { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Could not update status.');
+            window.liveToast?.({ type: 'general', title: 'Status updated', body: data.message });
+            await window.liveRefresh?.('leads', true);
+        } catch (e) {
+            window.liveToast?.({ type: 'alert', title: 'Not saved', body: e.message });
+            row?.classList.remove('saving');
+        }
+    };
+
+    document.addEventListener('change', (e) => {
+        const select = e.target.closest('[data-inline-status] select[name=status]');
+        if (!select) return;
+        const form = select.form;
+        const pick = form.querySelector('.follow-up-pick');
+        if (select.value === 'follow_up') {
+            pick.classList.remove('d-none');
+            const date = pick.querySelector('input');
+            date.required = true;
+            date.focus();
+            return;
+        }
+        pick.classList.add('d-none');
+        saveStatus(form);
+    });
+
+    document.addEventListener('submit', (e) => {
+        const form = e.target.closest('[data-inline-status]');
+        if (!form) return;
+        e.preventDefault();
+        saveStatus(form);
+    }, true);
+
+    /* ------------------------------------------------------------------ Active time (navbar) */
+    // Counts only while the employee is active: any mouse/keyboard/touch/scroll in the last 5 minutes.
+    // The server keeps the real total; the browser sends a heartbeat every 20 s.
+    const activeEl = document.getElementById('activeTimer');
+    if (activeEl) {
+        const cfg = JSON.parse(activeEl.dataset.activeTimer);
+        const display = activeEl.querySelector('[data-active-display]');
+        const stateEl = activeEl.querySelector('[data-active-state]');
+        const IDLE_AFTER = 5 * 60 * 1000;
+        let seconds = cfg.seconds;
+        let tracking = cfg.tracking;
+        let lastActivity = Date.now();
+
+        ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'].forEach((ev) =>
+            window.addEventListener(ev, () => { lastActivity = Date.now(); }, { passive: true }));
+
+        const isActive = () => tracking && !document.hidden && Date.now() - lastActivity < IDLE_AFTER;
+        const render = () => {
+            display.textContent = fmt.hms(seconds);
+            const active = isActive();
+            activeEl.classList.toggle('idle', !active);
+            if (stateEl) stateEl.textContent = !tracking ? 'Paused' : (active ? 'Active' : 'Idle');
+        };
+
+        const beat = async () => {
+            try {
+                const body = new URLSearchParams({ _token: csrf(), active: isActive() ? 1 : 0 });
+                const res = await fetch(cfg.url, { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                if (!res.ok) return;
+                const data = await res.json();
+                seconds = data.active_seconds;
+                tracking = data.tracking;
+                render();
+            } catch (e) { /* offline */ }
+        };
+
+        setInterval(() => { if (isActive()) seconds++; render(); }, 1000);
+        setInterval(beat, 20000);
+        beat();
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastActivity = Date.now(); beat(); } });
+        render();
+    }
+
+    /* ------------------------------------------------------------------ Live clock in punch-in popup */
+    setInterval(() => {
+        document.querySelectorAll('[data-clock]').forEach((el) => {
+            el.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        });
+    }, 1000);
 
     // "Select all" link for checkbox groups: <a data-check-all="users[]">
     document.addEventListener('click', (e) => {

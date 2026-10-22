@@ -28,6 +28,48 @@ class AttendanceService
         return $user->attendanceSessions()->with('breaks')->whereDate('work_date', today())->first();
     }
 
+    /** True when the employee has not punched in today and is not on approved leave. */
+    public function mustPunchIn(User $user): bool
+    {
+        if ($this->todaySession($user)) {
+            return false;
+        }
+
+        return ! $user->leaveRequests()
+            ->where('status', LeaveStatus::Approved)
+            ->where('leave_type', '!=', \App\Enums\LeaveType::WorkFromHome->value)
+            ->whereDate('from_date', '<=', today())
+            ->whereDate('to_date', '>=', today())
+            ->exists();
+    }
+
+    /** Count active (non-idle) time from a browser heartbeat. Idle / on-break heartbeats add nothing. */
+    public function heartbeat(User $user, bool $active): array
+    {
+        $session = $this->todaySession($user);
+
+        if (! $session || ! $session->isOpen()) {
+            return ['tracking' => false, 'active_seconds' => (int) $session?->active_seconds];
+        }
+
+        $now = now();
+        $onBreak = $session->activeBreak() !== null;
+
+        if ($active && ! $onBreak && $session->last_heartbeat_at) {
+            // Heartbeats come every ~20 s. A longer gap means the page was closed or the
+            // laptop slept, so that gap is not counted at all.
+            $gap = $now->getTimestamp() - $session->last_heartbeat_at->getTimestamp();
+            if ($gap > 0 && $gap <= 45) {
+                $session->active_seconds += $gap;
+            }
+        }
+
+        $session->last_heartbeat_at = $now;
+        $session->saveQuietly();
+
+        return ['tracking' => ! $onBreak, 'active_seconds' => $session->active_seconds, 'on_break' => $onBreak];
+    }
+
     public function lateRequestToday(User $user): ?LateCheckinRequest
     {
         return $user->lateCheckinRequests()->whereDate('work_date', today())->first();

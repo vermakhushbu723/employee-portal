@@ -13,7 +13,7 @@ class Lead extends Model
 {
     protected $fillable = [
         'batch_id', 'created_by', 'assigned_to', 'assigned_by', 'assigned_at', 'name', 'mobile', 'alternate_mobile', 'email', 'state', 'city',
-        'source', 'interest', 'remarks', 'status', 'follow_up_date', 'converted_at', 'created_at',
+        'source', 'interest', 'remarks', 'extra', 'status', 'follow_up_date', 'converted_at', 'created_at',
     ];
 
     protected function casts(): array
@@ -23,7 +23,13 @@ class Lead extends Model
             'follow_up_date' => 'date',
             'converted_at' => 'datetime',
             'assigned_at' => 'datetime',
+            'extra' => 'array',
         ];
+    }
+
+    public function latestActivity(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LeadActivity::class)->latestOfMany();
     }
 
     public function batch(): BelongsTo

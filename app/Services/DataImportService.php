@@ -50,6 +50,8 @@ class DataImportService
         }
 
         [$map, $hasHeader] = $this->columnMap($rows[0]);
+        $width = max(array_map('count', $rows));
+        $columns = $this->columnLabels($hasHeader ? $rows[0] : [], $width);
         if ($hasHeader) {
             array_shift($rows);
         }
@@ -82,6 +84,8 @@ class DataImportService
                 'source' => mb_substr($get('source') ?: $defaultSource, 0, 50),
                 'interest' => mb_substr($get('interest') ?: $defaultInterest, 0, 100),
                 'remarks' => mb_substr($get('remarks'), 0, 1000) ?: null,
+                // Every column of this row exactly as in the file (only the cells that have a value)
+                'extra' => json_encode($this->rowFields($row, $columns), JSON_UNESCAPED_UNICODE),
             ];
         }
 
@@ -92,10 +96,11 @@ class DataImportService
         $fresh = array_diff_key($records, $existing->all());
         $duplicates = $validCount - count($fresh);
 
-        $batch = DB::transaction(function () use ($admin, $file, $batchName, $rows, $fresh, $duplicates, $invalid) {
+        $batch = DB::transaction(function () use ($admin, $file, $batchName, $rows, $fresh, $duplicates, $invalid, $columns) {
             $batch = LeadBatch::create([
                 'name' => $batchName,
                 'file_name' => mb_substr($file->getClientOriginalName(), 0, 255),
+                'columns' => $columns,
                 'uploaded_by' => $admin->id,
                 'total_rows' => count($rows),
                 'imported' => count($fresh),
@@ -133,6 +138,36 @@ class DataImportService
         }
 
         return preg_match('/^[6-9]\d{9}$/', $digits) ? $digits : null;
+    }
+
+    /** Column titles as written in the file (blank / repeated titles get a number). */
+    private function columnLabels(array $headerRow, int $width): array
+    {
+        $labels = [];
+        for ($i = 0; $i < $width; $i++) {
+            $label = mb_substr(trim((string) ($headerRow[$i] ?? '')), 0, 60) ?: 'Column '.($i + 1);
+            $base = $label;
+            for ($n = 2; in_array($label, $labels, true); $n++) {
+                $label = "{$base} {$n}";
+            }
+            $labels[] = $label;
+        }
+
+        return $labels;
+    }
+
+    /** title => value for the non-empty cells of one row. */
+    private function rowFields(array $row, array $columns): array
+    {
+        $fields = [];
+        foreach ($columns as $i => $label) {
+            $value = trim((string) ($row[$i] ?? ''));
+            if ($value !== '') {
+                $fields[$label] = mb_substr($value, 0, 500);
+            }
+        }
+
+        return $fields;
     }
 
     /** @return array{0: array<string,int>, 1: bool} field => column index, and whether row 0 is a header */

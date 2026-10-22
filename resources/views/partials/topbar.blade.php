@@ -14,6 +14,14 @@
     <h1 class="topbar-title topbar-title-center d-lg-none">@yield('title', 'Dashboard')</h1>
 
     <div class="topbar-end">
+        @if ($activeTimer)
+            <div class="active-timer" id="activeTimer" data-active-timer='@json($activeTimer)' title="Active working time today (idle more than 5 min is not counted)">
+                <span class="dot"></span>
+                <i class="bi bi-stopwatch d-none d-sm-inline"></i>
+                <span data-active-display>{{ \App\Support\Duration::hms($activeTimer['seconds']) }}</span>
+                <span class="state d-none d-md-inline" data-active-state>{{ $activeTimer['tracking'] ? 'Active' : 'Paused' }}</span>
+            </div>
+        @endif
         <a href="{{ route('notifications.index') }}" class="btn-icon position-relative" aria-label="Announcements" id="bellLink">
             <i class="bi bi-bell"></i>
             <span class="topbar-badge {{ $alertCount > 0 ? '' : 'd-none' }}" id="bellBadge">{{ $alertCount > 9 ? '9+' : $alertCount }}</span>

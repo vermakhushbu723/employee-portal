@@ -12,7 +12,7 @@ class AttendanceSession extends Model
     protected $fillable = [
         'user_id', 'work_date', 'check_in_at', 'check_out_at', 'status', 'is_late',
         'worked_minutes', 'break_minutes', 'checkout_type', 'checkout_reason',
-        'review_status', 'reviewed_by', 'ip_address',
+        'review_status', 'reviewed_by', 'ip_address', 'active_seconds', 'last_heartbeat_at',
     ];
 
     protected function casts(): array
@@ -21,6 +21,8 @@ class AttendanceSession extends Model
             'work_date' => 'date',
             'check_in_at' => 'datetime',
             'check_out_at' => 'datetime',
+            'last_heartbeat_at' => 'datetime',
+            'active_seconds' => 'integer',
             'is_late' => 'boolean',
             'status' => AttendanceStatus::class,
         ];

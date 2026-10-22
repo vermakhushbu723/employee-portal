@@ -20,6 +20,7 @@
                 </div>
                 <div class="d-flex justify-content-between small mt-2">
                     <span>Worked <b>{{ Duration::hm($t['worked']) }}</b></span>
+                    <span>Active <b>{{ Duration::hm($t['active']) }}</b></span>
                     <span>Break <b>{{ Duration::hm($t['break_used']) }}</b></span>
                     <span class="text-danger">Left <b>{{ $t['checked_in'] ? Duration::hm($t['remaining']) : '—' }}</b></span>
                 </div>
@@ -40,6 +41,7 @@
                 <th>Status</th>
                 <th>Login</th>
                 <th>Worked</th>
+                <th>Active</th>
                 <th>Break</th>
                 <th>Remaining</th>
                 <th style="min-width:140px">Progress</th>
@@ -64,6 +66,7 @@
                     <td><x-badge :tone="$tone">{{ $label }}</x-badge> @if ($t['is_late'])<x-badge tone="danger">Late</x-badge>@endif</td>
                     <td>{{ $t['check_in_at'] ?? '—' }}</td>
                     <td class="fw-600">{{ Duration::hm($t['worked']) }}</td>
+                    <td class="text-success fw-600">{{ Duration::hm($t['active']) }}</td>
                     <td>{{ Duration::hm($t['break_used']) }}</td>
                     <td class="text-danger">{{ $t['checked_in'] ? Duration::hm($t['remaining']) : '—' }}</td>
                     <td>
@@ -74,7 +77,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7"><x-empty-state icon="people" title="No team members assigned" text="Ask the admin to assign employees to you." /></td></tr>
+                <tr><td colspan="8"><x-empty-state icon="people" title="No team members assigned" text="Ask the admin to assign employees to you." /></td></tr>
             @endforelse
         </tbody>
     </table>
