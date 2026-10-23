@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\LeadStatus;
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\Lead;
 use App\Models\LeadBatch;
 use App\Models\User;
@@ -31,7 +33,7 @@ class DataController extends Controller
                 'worked' => (clone $uploaded)->whereNotNull('assigned_to')->where('status', '!=', LeadStatus::New->value)->count(),
                 'converted' => (clone $uploaded)->where('status', LeadStatus::Converted->value)->count(),
             ],
-            'batches' => LeadBatch::with('uploader')
+            'batches' => LeadBatch::with('uploader', 'department')
                 ->withCount([
                     'leads as pool_count' => fn ($q) => $q->whereNull('assigned_to'),
                     'leads as assigned_count' => fn ($q) => $q->whereNotNull('assigned_to'),
@@ -43,24 +45,64 @@ class DataController extends Controller
             'recipients' => DataShareService::recipients(),
             'distribution' => DataShareService::distribution($batchId),
             'options' => config('portal.lead'),
+            // For the upload form: departments, their managers, and every employee (with department + manager)
+            'departments' => Department::forData()->get(),
+            'managers' => User::whereIn('role', [Role::Manager->value, Role::TeamLeader->value])->with('employee')->orderBy('name')->get(),
+            'staff' => User::whereIn('role', [Role::Employee->value, Role::TeamLeader->value])->with('employee.department')->orderBy('name')->get(),
         ]);
     }
 
+    /**
+     * Upload & share in one step: department + manager, employees, selected columns and the file.
+     * (The browser converts .xls/.xlsx to CSV before sending, so any Excel version works.)
+     */
     public function upload(Request $request, DataImportService $importer)
     {
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:5120', 'extensions:csv,txt,xlsx'],
-            'name' => ['required', 'string', 'max:100'],
-            'default_source' => ['required', 'string', 'max:50'],
-            'default_interest' => ['required', 'string', 'max:100'],
-        ], ['file.extensions' => 'Upload a CSV or Excel (.xlsx) file. Old .xls files: open in Excel and "Save As" .xlsx or CSV.']);
+            'file' => ['required', 'file', 'max:10240', 'extensions:csv,txt,xlsx'],
+            'original_name' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:100'],
+            'department_id' => ['required', 'integer', 'exists:departments,id'],
+            'manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'columns' => ['nullable', 'array'],
+            'columns.*' => ['string', 'max:100'],
+            'users' => ['nullable', 'array'],
+            'users.*' => ['integer', 'exists:users,id'],
+            'mode' => ['nullable', Rule::in(['equal', 'each'])],
+            'count' => ['nullable', 'integer', 'min:0', 'max:5000'],
+            'default_source' => ['nullable', 'string', 'max:50'],
+            'default_interest' => ['nullable', 'string', 'max:100'],
+        ], [
+            'department_id.required' => 'Select a department for this data.',
+            'file.extensions' => 'Upload a CSV or Excel file.',
+        ]);
 
-        $batch = $importer->import($request->user(), $request->file('file'), $data['name'], $data['default_source'], $data['default_interest']);
+        $department = Department::find($data['department_id']);
+        $batch = $importer->import(
+            $request->user(),
+            $request->file('file'),
+            ($data['name'] ?? null) ?: $department->name.' Data '.now()->format('d M h:i A'),
+            $data['default_source'] ?? 'Data Upload',
+            $data['default_interest'] ?? $department->name,
+            $data['columns'] ?? null,
+            $department->id,
+            $data['manager_id'] ?? null,
+            $data['original_name'] ?? null,
+        );
 
-        return redirect()->route('admin.data.index', ['batch' => $batch->id])
-            ->with('success', "\"{$batch->name}\" uploaded: {$batch->imported} new leads added".
-                ($batch->duplicates ? ", {$batch->duplicates} duplicate skipped" : '').
-                ($batch->invalid ? ", {$batch->invalid} invalid number(s) skipped" : '').'. Now share it with your team.');
+        $message = "\"{$batch->name}\" uploaded: {$batch->imported} new leads with ".count($batch->columns ?? []).' field(s)'.
+            ($batch->duplicates ? ", {$batch->duplicates} duplicate skipped" : '').
+            ($batch->invalid ? ", {$batch->invalid} invalid number(s) skipped" : '').'.';
+
+        if (! empty($data['users']) && $batch->imported > 0) {
+            $mode = $data['mode'] ?? 'equal';
+            $given = $this->share->share($request->user(), $batch->id, $data['users'], $mode, (int) ($data['count'] ?? 0));
+            $message .= ' Shared '.array_sum($given).' lead(s) with '.count($given).' employee(s).';
+        } else {
+            $message .= ' Not shared yet — use "Share Data" below.';
+        }
+
+        return redirect()->route('admin.data.index', ['batch' => $batch->id])->with('success', $message);
     }
 
     public function template()

@@ -24,6 +24,9 @@
 
         <div class="app-main">
             @include('partials.topbar')
+            @if (auth()->user()->role->portal() === 'employee')
+                @include('partials.employee-status-bar')
+            @endif
 
             <main class="app-content">
                 @include('partials.flash')

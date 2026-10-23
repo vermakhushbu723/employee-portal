@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Announcement;
 use App\Services\AttendanceService;
+use App\Services\WorkScoreService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -27,10 +28,23 @@ class AppServiceProvider extends ServiceProvider
             if ($user && $user->role->portal() === 'employee') {
                 $session = app(AttendanceService::class)->todaySession($user);
                 if ($session) {
+                    $activeBreak = $session->activeBreak();
+                    $closedBreaks = $session->breaks->whereNotNull('ended_at')
+                        ->sum(fn ($b) => $b->ended_at->getTimestamp() - $b->started_at->getTimestamp());
+                    $end = $session->check_out_at;
+
                     $activeTimer = [
                         'seconds' => (int) $session->active_seconds,
-                        'tracking' => $session->isOpen() && ! $session->activeBreak(),
+                        'tracking' => $session->isOpen() && ! $activeBreak,
                         'url' => route('employee.activity.heartbeat'),
+                        'idle_after' => (int) config('portal.work_score.idle_after_seconds', 60),
+                        // for the live idle / break counters in the status bar (epoch seconds)
+                        'check_in' => $session->check_in_at->getTimestamp(),
+                        'ended' => $end?->getTimestamp(),
+                        'break_closed' => (int) $closedBreaks,
+                        'break_started' => $activeBreak?->started_at->getTimestamp(),
+                        'break_allowed' => $user->currentShift()->break_allowed_minutes * 60,
+                        'server_now' => now()->getTimestamp(),
                     ];
                 }
             }
@@ -38,6 +52,22 @@ class AppServiceProvider extends ServiceProvider
             $view->with([
                 'alertCount' => $user ? Announcement::visibleTo($user)->where('published_at', '>=', now()->subDays(7))->count() : 0,
                 'activeTimer' => $activeTimer,
+            ]);
+        });
+
+        // Employee status bar: date, login, working / idle / break time, leaves, online status.
+        View::composer('partials.employee-status-bar', function ($view) {
+            $user = auth()->user();
+            $session = app(AttendanceService::class)->todaySession($user);
+            $balances = $user->leaveBalances()->where('year', now()->year)->get();
+
+            $view->with([
+                'sbUser' => $user,
+                'sbSession' => $session,
+                'sbWork' => $session ? app(WorkScoreService::class)->forSession($user, $session) : null,
+                'sbLeavesUsed' => $balances->sum('used'),
+                'sbLeavesLeft' => $balances->sum(fn ($b) => $b->available()),
+                'sbBreakAllowed' => $user->currentShift()->break_allowed_minutes * 60,
             ]);
         });
 

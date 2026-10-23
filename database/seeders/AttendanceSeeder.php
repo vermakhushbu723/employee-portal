@@ -46,6 +46,11 @@ class AttendanceSeeder extends Seeder
                     'is_late' => $late,
                     'worked_minutes' => $workedMinutes,
                     'break_minutes' => $breakMinutes,
+                    'active_seconds' => $workedMinutes * 60 - ($n % 9) * 60,
+                    'leads_created' => $halfDay ? 9 : 20 + $n % 4,
+                    'interested_count' => $halfDay ? 8 : 20 + $n % 3,
+                    'work_score' => $halfDay ? 52 : 100,
+                    'grade' => $halfDay ? 'half' : 'full',
                     'checkout_type' => 'normal',
                 ]);
 

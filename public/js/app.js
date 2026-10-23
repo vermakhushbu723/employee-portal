@@ -277,7 +277,9 @@
         const cfg = JSON.parse(activeEl.dataset.activeTimer);
         const display = activeEl.querySelector('[data-active-display]');
         const stateEl = activeEl.querySelector('[data-active-state]');
-        const IDLE_AFTER = 5 * 60 * 1000;
+        const IDLE_AFTER = (cfg.idle_after || 60) * 1000;
+        const clockOffset = (cfg.server_now || Date.now() / 1000) - Date.now() / 1000; // server vs device clock
+        const sb = (name) => document.querySelector(`[data-sb="${name}"]`);
         let seconds = cfg.seconds;
         let tracking = cfg.tracking;
         let lastActivity = Date.now();
@@ -290,7 +292,25 @@
             display.textContent = fmt.hms(seconds);
             const active = isActive();
             activeEl.classList.toggle('idle', !active);
-            if (stateEl) stateEl.textContent = !tracking ? 'Paused' : (active ? 'Active' : 'Idle');
+            if (stateEl) stateEl.textContent = !tracking ? 'Active · paused' : (active ? 'Active' : 'Active · idle');
+
+            // Navbar inactive time + status bar: working / idle / break counters
+            const now = Date.now() / 1000 + clockOffset;
+            const end = cfg.ended || now;
+            const breakUsed = cfg.break_closed + (cfg.break_started ? Math.max(0, end - cfg.break_started) : 0);
+            const idle = Math.max(0, end - cfg.check_in - breakUsed - seconds);
+            document.querySelectorAll('[data-idle-nav]').forEach((el) => { el.textContent = fmt.hms(idle); });
+            document.querySelectorAll('[data-total-nav]').forEach((el) => { el.textContent = fmt.hms(Math.max(0, end - cfg.check_in)); });
+            if (sb('active')) {
+                sb('active').textContent = fmt.hms(seconds);
+                sb('idle').textContent = fmt.hms(idle);
+                sb('break').textContent = fmt.hms(breakUsed);
+                sb('break_left').textContent = `${Math.floor(breakUsed / 60)} / ${Math.round(cfg.break_allowed / 60)} min`;
+                const bar = sb('break_bar');
+                if (bar) bar.style.width = `${Math.min(100, (breakUsed / Math.max(1, cfg.break_allowed)) * 100)}%`;
+                sb('online')?.classList.toggle('idle', !active);
+                if (sb('online_text') && !cfg.ended) sb('online_text').textContent = cfg.break_started ? 'On Break' : (active ? 'Online' : 'Idle');
+            }
         };
 
         const beat = async () => {
@@ -423,6 +443,13 @@
         }));
         window.addEventListener('appinstalled', () => showState('done'));
     }
+
+    // Header checkbox that ticks every row checkbox with the given name: <input data-toggle-rows="ids[]">
+    document.addEventListener('change', (e) => {
+        const head = e.target.closest('[data-toggle-rows]');
+        if (!head) return;
+        document.querySelectorAll(`input[type=checkbox][name="${head.dataset.toggleRows}"]`).forEach((b) => { b.checked = head.checked; });
+    });
 
     // Copy-to-clipboard buttons: <button data-copy="text">
     document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {

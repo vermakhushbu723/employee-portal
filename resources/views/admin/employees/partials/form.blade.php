@@ -112,6 +112,17 @@
                 <label class="form-label">Monthly Salary</label>
                 <input type="number" name="monthly_salary" value="{{ old('monthly_salary', $emp?->monthly_salary) }}" min="0" class="form-control">
             </div>
+            @php
+                $dailyTargets = $user ? app(\App\Services\WorkScoreService::class)->targets($user) : config('portal.work_score.default_targets');
+            @endphp
+            <div class="col-md-6">
+                <label class="form-label">Daily Lead Creation Target</label>
+                <input type="number" name="target_leads" min="0" max="1000" value="{{ old('target_leads', $dailyTargets['leads']) }}" class="form-control @error('target_leads') is-invalid @enderror">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Daily Interested / Mature Target</label>
+                <input type="number" name="target_interested" min="0" max="1000" value="{{ old('target_interested', $dailyTargets['interested']) }}" class="form-control @error('target_interested') is-invalid @enderror">
+            </div>
         </div>
     </div>
 </div>

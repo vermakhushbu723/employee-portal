@@ -21,7 +21,11 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceService
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(
+        private AuditLogger $audit,
+        private WorkScoreService $score,
+        private DailyReportService $reports,
+    ) {}
 
     public function todaySession(User $user): ?AttendanceSession
     {
@@ -278,8 +282,16 @@ class AttendanceService
             $reasons[] = 'End your current break before checking out.';
         }
 
-        if ($timer['remaining'] > 0) {
-            $reasons[] = 'Complete '.Duration::hm($timer['remaining']).' more of required work hours.';
+        // Work must be complete: active time for the shift + daily lead targets
+        $work = $this->score->forSession($user, $session);
+        if ($work['active'] < $work['required']) {
+            $reasons[] = 'Active work time '.Duration::hm($work['active']).' of '.Duration::hm($work['required']).' — '.Duration::hm($work['required'] - $work['active']).' more needed (idle time is not counted).';
+        }
+        if ($work['created'] < $work['targets']['leads']) {
+            $reasons[] = 'Leads created '.$work['created'].' of '.$work['targets']['leads'].' — create '.($work['targets']['leads'] - $work['created']).' more.';
+        }
+        if ($work['interested'] < $work['targets']['interested']) {
+            $reasons[] = 'Interested / Mature leads '.$work['interested'].' of '.$work['targets']['interested'].' — '.($work['targets']['interested'] - $work['interested']).' more needed.';
         }
 
         if (($pending = $this->pendingTasks($user)) > 0) {
@@ -331,7 +343,6 @@ class AttendanceService
             $timer = $this->timer($user, $session);
 
             $session->fill([
-                'status' => $timer['worked'] >= $timer['required'] ? $session->status : AttendanceStatus::HalfDay,
                 'worked_minutes' => intdiv($timer['worked'], 60),
                 'break_minutes' => intdiv($timer['break_used'], 60),
                 'checkout_type' => $exception ? 'exception' : 'normal',
@@ -339,12 +350,44 @@ class AttendanceService
                 'review_status' => $exception ? 'pending' : null,
             ])->save();
 
+            // Attendance for the day comes from the work score (full / half / quarter / absent)
+            $this->score->finalize($session);
+            DB::afterCommit(fn () => $this->reports->send($session->fresh(['user.employee.manager', 'breaks'])));
+
             $this->audit->log(
                 $exception ? 'attendance.exception_checkout' : 'attendance.check_out',
                 'Checked out at '.$now->format('h:i A').' after '.Duration::hm($timer['worked']),
                 ['session_id' => $session->id, 'reason' => $reason],
                 $user,
             );
+
+            return $session;
+        });
+    }
+
+    /** Admin punches an employee out (forgot / left). The day is scored from the active time so far. */
+    public function forceCheckOut(AttendanceSession $session, User $admin): AttendanceSession
+    {
+        return DB::transaction(function () use ($session, $admin) {
+            $session->load('breaks', 'user');
+            $now = now();
+
+            foreach ($session->breaks->whereNull('ended_at') as $break) {
+                $break->update(['ended_at' => $now, 'duration_minutes' => intdiv(self::seconds($break->started_at, $now), 60)]);
+            }
+
+            $session->check_out_at = $now;
+            $timer = $this->timer($session->user, $session);
+            $session->fill([
+                'worked_minutes' => intdiv($timer['worked'], 60),
+                'break_minutes' => intdiv($timer['break_used'], 60),
+                'checkout_type' => 'admin',
+                'checkout_reason' => "Punched out by {$admin->name}",
+            ])->save();
+
+            $this->score->finalize($session);
+            $this->audit->log('attendance.admin_checkout', "Punched out {$session->user->employee_code}", ['session_id' => $session->id], $admin);
+            DB::afterCommit(fn () => $this->reports->send($session->fresh(['user.employee.manager', 'breaks'])));
 
             return $session;
         });

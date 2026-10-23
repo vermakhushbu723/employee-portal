@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DailyWorkReportController;
 use App\Http\Controllers\Employee;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LiveController;
@@ -111,6 +112,10 @@ Route::middleware(['auth', 'role:manager,team_leader'])
         Route::get('dashboard', Manager\DashboardController::class)->name('dashboard');
         Route::get('team', Manager\TeamController::class)->name('team');
 
+        Route::get('reports/daily', [DailyWorkReportController::class, 'index'])->name('reports.daily');   // own team, view only
+        Route::get('targets', [Manager\TargetController::class, 'index'])->name('targets');
+        Route::post('targets', [Manager\TargetController::class, 'update'])->name('targets.update');
+
         Route::get('assign-work', [Manager\AssignWorkController::class, 'create'])->name('assign-work.create');
         Route::post('assign-work', [Manager\AssignWorkController::class, 'store'])->name('assign-work.store');
 
@@ -141,6 +146,16 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::patch('employees/{user}/status', [Admin\EmployeeController::class, 'toggleStatus'])->whereNumber('user')->name('employees.status');
 
         Route::get('interested-leads', Admin\InterestedLeadController::class)->name('leads.interested');
+
+        // Department-wise data tracking
+        Route::get('departments', [Admin\DepartmentDataController::class, 'index'])->name('departments.index');
+        Route::get('departments/{department}', [Admin\DepartmentDataController::class, 'show'])->whereNumber('department')->name('departments.show');
+
+        // Daily work report (admin: all employees, download, correct, punch out, mail)
+        Route::get('reports/daily', [DailyWorkReportController::class, 'index'])->name('reports.daily');
+        Route::post('reports/{session}/correct', [DailyWorkReportController::class, 'correct'])->whereNumber('session')->name('reports.correct');
+        Route::post('reports/{session}/punch-out', [DailyWorkReportController::class, 'punchOut'])->whereNumber('session')->name('reports.punch-out');
+        Route::post('reports/{session}/send', [DailyWorkReportController::class, 'send'])->whereNumber('session')->name('reports.send');
 
         // Data upload & share (calling lists)
         Route::controller(Admin\DataController::class)->prefix('data')->name('data.')->group(function () {

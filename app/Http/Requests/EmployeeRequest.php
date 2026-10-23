@@ -38,7 +38,18 @@ class EmployeeRequest extends FormRequest
             'training_to' => ['nullable', 'date', 'required_with:training_from', 'after_or_equal:training_from'],
             'joining_date' => ['nullable', 'date', Rule::when($this->filled('training_to'), 'after_or_equal:training_to')],
             'monthly_salary' => ['nullable', 'numeric', 'min:0'],
+            'target_leads' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'target_interested' => ['nullable', 'integer', 'min:0', 'max:1000'],
         ];
+    }
+
+    /** Daily work targets (lead creation + interested/mature) for the work score. */
+    public function targetData(): array
+    {
+        return array_filter([
+            'leads' => $this->validated('target_leads'),
+            'interested' => $this->validated('target_interested'),
+        ], fn ($v) => $v !== null && $v !== '');
     }
 
     public function after(): array

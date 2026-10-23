@@ -52,6 +52,7 @@ class EmployeeController extends Controller
             ]);
 
             $user->employee()->create($request->profileData());
+            self::saveTargets($user, $request->targetData());
 
             foreach (LeaveType::balanced() as $type) {
                 $user->leaveBalances()->create(['year' => now()->year, 'leave_type' => $type->value, 'total' => $type === LeaveType::Earned ? 2 : 4]);
@@ -91,6 +92,7 @@ class EmployeeController extends Controller
 
             $user->save();
             $user->employee()->updateOrCreate([], $request->profileData());
+            self::saveTargets($user, $request->targetData());
         });
 
         $audit->log('employee.update', "Updated account {$user->employee_code}".($before !== $user->role ? " (role {$before->label()} → {$user->role->label()})" : ''), ['user_id' => $user->id]);
@@ -107,6 +109,14 @@ class EmployeeController extends Controller
         $audit->log('employee.status', "{$user->employee_code} marked {$user->status}", ['user_id' => $user->id]);
 
         return back()->with('success', "{$user->name} is now {$user->status}.");
+    }
+
+    /** Store daily targets (metric => value) used by the work score. */
+    public static function saveTargets(User $user, array $targets): void
+    {
+        foreach ($targets as $metric => $value) {
+            $user->targets()->updateOrCreate(['metric' => $metric, 'period' => 'daily'], ['target_value' => (int) $value]);
+        }
     }
 
     private function formOptions(?User $editing = null): array

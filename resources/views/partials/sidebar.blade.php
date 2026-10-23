@@ -21,6 +21,32 @@
             @foreach ($menu as $item)
                 @isset($item['heading'])
                     <div class="sidebar-heading">{{ $item['heading'] }}</div>
+                @elseif (($item['children'] ?? null) === 'departments')
+                    {{-- Dropdown: one sub-item per department --}}
+                    @php
+                        $open = request()->routeIs(...(array) $item['active']);
+                        $routeDept = request()->route('department');
+                        $currentDept = $routeDept instanceof \App\Models\Department ? $routeDept->id : (int) $routeDept;
+                        $menuDepartments = \App\Models\Department::forData()->get();
+                    @endphp
+                    <a href="#deptMenu" data-bs-toggle="collapse" role="button" aria-expanded="{{ $open ? 'true' : 'false' }}" aria-controls="deptMenu"
+                       @class(['nav-link', 'has-sub', 'open' => $open, 'collapsed' => ! $open])>
+                        <i class="bi bi-{{ $item['icon'] }}"></i>
+                        <span>{{ $item['label'] }}</span>
+                        <i class="bi bi-chevron-down sub-caret"></i>
+                    </a>
+                    <div @class(['collapse', 'show' => $open]) id="deptMenu">
+                        <div class="sidebar-sub">
+                            <a href="{{ route('admin.departments.index') }}" @class(['nav-link', 'active' => request()->routeIs('admin.departments.index')])>
+                                <i class="bi bi-grid"></i><span>All Departments</span>
+                            </a>
+                            @foreach ($menuDepartments as $dept)
+                                <a href="{{ route('admin.departments.show', $dept) }}" @class(['nav-link', 'active' => $currentDept === $dept->id])>
+                                    <i class="bi bi-{{ $dept->icon() }}"></i><span>{{ $dept->name }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
                 @else
                     <a href="{{ route($item['route']) }}"
                        @class(['nav-link', 'active' => request()->routeIs(...(array) ($item['active'] ?? $item['route']))])>

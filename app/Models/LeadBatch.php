@@ -9,7 +9,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** One uploaded calling-data file. */
 class LeadBatch extends Model
 {
-    protected $fillable = ['name', 'file_name', 'columns', 'uploaded_by', 'total_rows', 'imported', 'duplicates', 'invalid'];
+    protected $fillable = ['name', 'department_id', 'manager_id', 'file_name', 'columns', 'uploaded_by', 'total_rows', 'imported', 'duplicates', 'invalid'];
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
 
     protected function casts(): array
     {

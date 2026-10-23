@@ -18,6 +18,23 @@ return [
     // Carbon day-of-week numbers treated as weekly off (0 = Sunday).
     'weekly_off' => [0],
 
+    /*
+    | Work-based attendance. Score = average of three parts (each max 100%):
+    |   active time / shift time, leads created / target, interested+converted / target.
+    | e.g. 8h + 20 + 20 = 100% (Full), 4h + 10 + 10 = 50% (Half), 2h + 5 + 5 = 25% (Quarter).
+    */
+    'work_score' => [
+        'default_targets' => ['leads' => 20, 'interested' => 20],   // per day; admin/manager can set per employee
+        'grades' => ['full' => 100, 'half' => 50, 'quarter' => 25], // minimum score for each grade; below quarter = absent
+        'idle_after_seconds' => 60,                                  // no activity for 1 minute = not working
+    ],
+
+    // Daily work report e-mail (sent at punch-out and after an admin correction)
+    'report_mail' => [
+        'enabled' => (bool) env('REPORT_MAIL_ENABLED', true),
+        'cc_admins' => (bool) env('REPORT_MAIL_CC_ADMINS', true),
+    ],
+
     'lead' => [
         'cities' => ['Delhi', 'Gurugram', 'Noida', 'Mumbai', 'Bengaluru', 'Lucknow', 'Pune', 'Jaipur', 'Hyderabad', 'Kolkata'],
         'sources' => ['Cold Call', 'Website', 'Facebook', 'Instagram', 'Referral', 'Walk-in', 'WhatsApp', 'Other'],
@@ -81,6 +98,8 @@ return [
             ['heading' => 'Team'],
             ['route' => 'manager.dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
             ['route' => 'manager.team', 'icon' => 'broadcast', 'label' => 'Live Monitoring'],
+            ['route' => 'manager.reports.daily', 'icon' => 'clipboard-data', 'label' => 'Daily Work Report'],
+            ['route' => 'manager.targets', 'icon' => 'bullseye', 'label' => 'Daily Targets'],
             ['route' => 'manager.assign-work.create', 'icon' => 'clipboard-plus', 'label' => 'Assign Work'],
             ['route' => 'manager.approvals.index', 'icon' => 'check2-square', 'label' => 'Approvals'],
             ['heading' => 'Account'],
@@ -92,8 +111,11 @@ return [
             ['heading' => 'Administration'],
             ['route' => 'admin.dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
             ['route' => 'admin.employees.index', 'active' => 'admin.employees.*', 'icon' => 'person-badge', 'label' => 'Employees'],
+            // 'children' => 'departments': sidebar shows every department as a dropdown sub-menu
+            ['route' => 'admin.departments.index', 'active' => 'admin.departments.*', 'icon' => 'building', 'label' => 'Department Data', 'children' => 'departments'],
             ['route' => 'admin.data.index', 'active' => 'admin.data.*', 'icon' => 'cloud-arrow-up', 'label' => 'Data Upload & Share'],
             ['route' => 'admin.leads.interested', 'icon' => 'hand-thumbs-up', 'label' => 'Interested Leads'],
+            ['route' => 'admin.reports.daily', 'icon' => 'clipboard-data', 'label' => 'Daily Work Report'],
             ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late Check-in Requests'],
             ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leave Approvals'],
             ['heading' => 'Account'],

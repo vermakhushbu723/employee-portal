@@ -26,10 +26,11 @@
         </div>
 
         <div class="row g-2 mb-3">
-            <div class="col-3"><x-stat-tile class="flex-column text-center" icon="check-lg" label="Present" tone="success" :value="$counts['present']" /></div>
-            <div class="col-3"><x-stat-tile class="flex-column text-center" icon="calendar-x" label="Leave" tone="danger" :value="$counts['leave']" /></div>
-            <div class="col-3"><x-stat-tile class="flex-column text-center" icon="circle-half" label="Half Day" tone="warning" :value="$counts['half_day']" /></div>
-            <div class="col-3"><x-stat-tile class="flex-column text-center" icon="x-lg" label="Absent" tone="secondary" :value="$counts['absent']" /></div>
+            <div class="col"><x-stat-tile class="flex-column text-center" icon="battery-full" label="Full Day" tone="success" :value="$counts['present']" /></div>
+            <div class="col"><x-stat-tile class="flex-column text-center" icon="battery-half" label="Half Day" tone="warning" :value="$counts['half_day']" /></div>
+            <div class="col"><x-stat-tile class="flex-column text-center" icon="battery" label="Quarter" tone="purple" :value="$counts['quarter_day']" /></div>
+            <div class="col"><x-stat-tile class="flex-column text-center" icon="x-lg" label="Absent" tone="secondary" :value="$counts['absent']" /></div>
+            <div class="col"><x-stat-tile class="flex-column text-center" icon="calendar-x" label="Leave" tone="danger" :value="$counts['leave']" /></div>
         </div>
 
         <div class="card-soft card-pad mb-3">
@@ -46,37 +47,47 @@
                     @php
                         $status = $day['status'];
                         $session = $day['session'];
+                        [$level, $gradeLabel, $gradeTone] = \App\Services\WorkScoreService::battery($day['grade']);
                         $detail = [
                             'date' => $day['date']->format('l, d M Y'),
-                            'status' => $status?->label() ?? '—',
+                            'status' => ($gradeLabel ?: $status?->label() ?? '—').($day['score'] !== null ? " · {$day['score']}% work" : ''),
                             'login' => $session?->check_in_at->format('h:i A') ?? '—',
-                            'logout' => $session?->check_out_at?->format('h:i A') ?? '—',
+                            'logout' => $session?->check_out_at?->format('h:i A') ?? ($session ? 'Not punched out' : '—'),
                             'break' => $session ? $session->break_minutes.' min' : '—',
-                            'worked' => $session ? Duration::minutes($session->worked_minutes) : '—',
-                            'note' => $day['leave'] ? $day['leave']->leave_type->label().' — '.$day['leave']->reason : '',
+                            'worked' => $session ? Duration::hm((int) $session->active_seconds).' active' : '—',
+                            'leads' => $session ? "{$session->leads_created} created · {$session->interested_count} interested" : '—',
+                            'note' => $day['leave'] ? $day['leave']->leave_type->label().' — '.$day['leave']->reason : ($session?->correction_note ? 'Admin note: '.$session->correction_note : ''),
                         ];
                         $clickable = $status !== null && $status !== AttendanceStatus::WeeklyOff;
-                        $classes = ['cal-day'];
-                        if ($clickable) { $classes[] = 'has-status tone-'.$status->tone(); }
+                        $tone = $level !== null ? $gradeTone : $status?->tone();
+                        $classes = ['cal-cell'];
+                        if ($clickable) { $classes[] = 'has-status tone-'.$tone; }
                         if ($day['date']->isToday()) { $classes[] = 'today'; }
                         elseif ($day['date']->isFuture()) { $classes[] = 'future'; }
                     @endphp
                     <div>
                         <button type="button" class="{{ implode(' ', $classes) }}"
                                 @if ($clickable) data-modal="#dayModal" data-fill='@json($detail)' @endif
-                                title="{{ $status?->label() }}">
-                            {{ $day['date']->day }}
+                                title="{{ $gradeLabel ?: $status?->label() }}{{ $day['score'] !== null ? ' — '.$day['score'].'%' : '' }}">
+                            <span class="d">{{ $day['date']->day }}</span>
+                            @if ($level !== null)
+                                <span class="battery tone-{{ $gradeTone }}"><span style="width: {{ max($level, 4) }}%"></span></span>
+                            @elseif ($status === AttendanceStatus::Leave)
+                                <span class="small-xs">Leave</span>
+                            @endif
                         </button>
                     </div>
                 @endforeach
             </div>
 
             <div class="legend mt-3">
-                <span class="tone-success">Present</span>
-                <span class="tone-danger">Leave</span>
-                <span class="tone-warning">Half Day</span>
+                <span class="tone-success">Full Day (100% work)</span>
+                <span class="tone-warning">Half Day (50%+)</span>
+                <span class="tone-purple">Quarter (25%+)</span>
                 <span class="tone-secondary">Absent</span>
+                <span class="tone-danger">Leave</span>
             </div>
+            <div class="small-xs text-muted mt-1">Work % = average of active time, leads created and interested/mature leads against your daily targets.</div>
         </div>
     </div>
 
@@ -141,7 +152,8 @@
                 <div class="kv-row"><span class="k">Login Time</span><span class="v" data-field="login"></span></div>
                 <div class="kv-row"><span class="k">Logout Time</span><span class="v" data-field="logout"></span></div>
                 <div class="kv-row"><span class="k">Break Duration</span><span class="v" data-field="break"></span></div>
-                <div class="kv-row"><span class="k">Working Hours</span><span class="v" data-field="worked"></span></div>
+                <div class="kv-row"><span class="k">Working Time</span><span class="v" data-field="worked"></span></div>
+                <div class="kv-row"><span class="k">Leads</span><span class="v" data-field="leads"></span></div>
                 <div class="small text-muted mt-2" data-field="note"></div>
             </div>
         </div>

@@ -49,6 +49,39 @@
     </div>
 
     <div data-live-region="leads">
+        @if ($score)
+            @php
+                [$lvl, $gradeLabel, $gradeTone] = \App\Services\WorkScoreService::battery($score['grade']);
+                $scoreParts = [
+                    ['Active time', \App\Support\Duration::hm($score['active']).' / '.\App\Support\Duration::hm($score['required']), $score['parts']['time'], 'success'],
+                    ['Leads created', $score['created'].' / '.$score['targets']['leads'], $score['parts']['leads'], 'primary'],
+                    ['Interested / Mature', $score['interested'].' / '.$score['targets']['interested'], $score['parts']['interested'], 'warning'],
+                ];
+            @endphp
+            <div class="card-soft card-pad mb-3">
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="battery lg tone-{{ $gradeTone }}"><span style="width: {{ max(4, min(100, $score['score'])) }}%"></span></span>
+                        <div>
+                            <div class="small text-muted">Today's Work Score</div>
+                            <div class="fs-4 fw-bold lh-1">{{ $score['score'] }}% <span class="small fw-600" style="color: var(--{{ $gradeTone === 'secondary' ? 'muted' : $gradeTone }})">{{ $gradeLabel }}{{ $timer['checked_out'] ? '' : ' so far' }}</span></div>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 row g-2" style="min-width: 260px">
+                        @foreach ($scoreParts as [$label, $value, $pct, $tone])
+                            <div class="col-md-4">
+                                <div class="d-flex justify-content-between small"><span class="text-muted">{{ $label }}</span><b>{{ $value }}</b></div>
+                                <x-progress class="mt-1" :value="$pct" :tone="$tone" />
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+                @unless ($score['complete'])
+                    <div class="small-xs text-muted mt-2"><i class="bi bi-lock-fill"></i> Punch-out unlocks at 100% (full shift active time + lead targets). Idle time is not counted.</div>
+                @endunless
+            </div>
+        @endif
+
         @if ($newData > 0)
             <a href="{{ route('employee.leads.index', ['tab' => 'new']) }}" class="status-banner tone-info mb-3 text-decoration-none">
                 <span class="dot"><i class="bi bi-stars small"></i></span>

@@ -36,8 +36,20 @@ class DataImportService
 
     public function __construct(private AuditLogger $audit) {}
 
-    public function import(User $admin, UploadedFile $file, string $batchName, string $defaultSource, string $defaultInterest): LeadBatch
-    {
+    /**
+     * @param  array|null  $selected  column titles chosen by the admin — only these are stored/shared (null = all)
+     */
+    public function import(
+        User $admin,
+        UploadedFile $file,
+        string $batchName,
+        string $defaultSource,
+        string $defaultInterest,
+        ?array $selected = null,
+        ?int $departmentId = null,
+        ?int $managerId = null,
+        ?string $originalName = null,
+    ): LeadBatch {
         try {
             $rows = SpreadsheetReader::read($file->getRealPath(), $file->getClientOriginalExtension(), self::MAX_ROWS);
         } catch (RuntimeException $e) {
@@ -57,6 +69,16 @@ class DataImportService
         }
         if (! isset($map['mobile'])) {
             throw ValidationException::withMessages(['file' => 'Could not find a Mobile / Phone column. Use the sample template.']);
+        }
+
+        // Keep only the columns the admin selected (original positions are preserved)
+        if ($selected) {
+            $selected = array_map(fn ($s) => trim((string) $s), $selected);
+            $columns = array_filter($columns, fn ($label) => in_array($label, $selected, true));
+            $map = array_filter($map, fn ($index) => isset($columns[$index]));
+            if (! isset($map['mobile'])) {
+                throw ValidationException::withMessages(['columns' => 'The Mobile Number column must be selected — it is needed for calling.']);
+            }
         }
         if (count($rows) > self::MAX_ROWS) {
             throw ValidationException::withMessages(['file' => 'Maximum '.self::MAX_ROWS.' rows per upload. Split the file and upload again.']);
@@ -96,11 +118,13 @@ class DataImportService
         $fresh = array_diff_key($records, $existing->all());
         $duplicates = $validCount - count($fresh);
 
-        $batch = DB::transaction(function () use ($admin, $file, $batchName, $rows, $fresh, $duplicates, $invalid, $columns) {
+        $batch = DB::transaction(function () use ($admin, $file, $batchName, $rows, $fresh, $duplicates, $invalid, $columns, $departmentId, $managerId, $originalName) {
             $batch = LeadBatch::create([
                 'name' => $batchName,
-                'file_name' => mb_substr($file->getClientOriginalName(), 0, 255),
-                'columns' => $columns,
+                'department_id' => $departmentId,
+                'manager_id' => $managerId,
+                'file_name' => mb_substr($originalName ?: $file->getClientOriginalName(), 0, 255),
+                'columns' => array_values($columns),
                 'uploaded_by' => $admin->id,
                 'total_rows' => count($rows),
                 'imported' => count($fresh),

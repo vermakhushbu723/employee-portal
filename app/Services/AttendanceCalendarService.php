@@ -15,12 +15,18 @@ use Illuminate\Support\Carbon;
  */
 class AttendanceCalendarService
 {
+    public function __construct(private WorkScoreService $score) {}
+
     public function build(User $user, Carbon $month): array
     {
+        // Days left open (browser closed / device off) are closed at the last activity
+        $this->score->finalizePastDays($user);
+
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
 
         $sessions = $user->attendanceSessions()
+            ->with('breaks')
             ->whereBetween('work_date', [$start->toDateString(), $end->toDateString()])
             ->get()
             ->keyBy(fn ($s) => $s->work_date->toDateString());
@@ -40,7 +46,7 @@ class AttendanceCalendarService
 
         $joined = ($user->employee?->joining_date ?? $user->created_at)->copy()->startOfDay();
         $weeklyOff = config('portal.weekly_off', [0]);
-        $counts = ['present' => 0, 'leave' => 0, 'half_day' => 0, 'absent' => 0, 'weekly_off' => 0];
+        $counts = ['present' => 0, 'leave' => 0, 'half_day' => 0, 'quarter_day' => 0, 'absent' => 0, 'weekly_off' => 0];
         $days = [];
 
         foreach (CarbonPeriod::create($start, $end) as $date) {
@@ -66,11 +72,21 @@ class AttendanceCalendarService
                 $counts[$bucket]++;
             }
 
+            // Battery level: today's open session shows its live score; closed days their grade
+            $grade = match (true) {
+                $session !== null && $session->grade !== null => $session->grade,
+                $session !== null => WorkScoreService::gradeFor($this->score->forSession($user, $session)['score']),
+                $status === AttendanceStatus::Absent => 'none',
+                default => null,
+            };
+
             $days[] = [
                 'date' => $date->copy(),
                 'status' => $status,
                 'session' => $session,
                 'leave' => $leave,
+                'grade' => $grade,
+                'score' => $session?->work_score ?? ($session ? $this->score->forSession($user, $session)['score'] : null),
             ];
         }
 

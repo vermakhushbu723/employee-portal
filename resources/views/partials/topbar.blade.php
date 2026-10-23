@@ -14,12 +14,24 @@
     <h1 class="topbar-title topbar-title-center d-lg-none">@yield('title', 'Dashboard')</h1>
 
     <div class="topbar-end">
+        <button type="button" class="btn-icon refresh-btn" onclick="this.classList.add('spinning'); location.reload();" title="Refresh" aria-label="Refresh page">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
         @if ($activeTimer)
-            <div class="active-timer" id="activeTimer" data-active-timer='@json($activeTimer)' title="Active working time today (idle more than 5 min is not counted)">
-                <span class="dot"></span>
-                <i class="bi bi-stopwatch d-none d-sm-inline"></i>
-                <span data-active-display>{{ \App\Support\Duration::hms($activeTimer['seconds']) }}</span>
-                <span class="state d-none d-md-inline" data-active-state>{{ $activeTimer['tracking'] ? 'Active' : 'Paused' }}</span>
+            {{-- Three running timers: Active (working) · Inactive (no activity > 1 min) · Total (since punch-in) --}}
+            <div class="time-chips d-none d-md-flex" id="activeTimer" data-active-timer='@json($activeTimer)'>
+                <div class="time-chip tone-success" title="Active working time today — counts only while you use the portal">
+                    <span class="dot"></span>
+                    <div><span class="tc-label" data-active-state>Active</span><span class="tc-value" data-active-display>{{ \App\Support\Duration::hms($activeTimer['seconds']) }}</span></div>
+                </div>
+                <div class="time-chip tone-danger" title="Inactive time today — no activity for more than 1 minute, browser closed or device off">
+                    <i class="bi bi-pause-circle-fill"></i>
+                    <div><span class="tc-label">Inactive</span><span class="tc-value" data-idle-nav>00:00:00</span></div>
+                </div>
+                <div class="time-chip tone-primary" title="Total time since punch-in (active + inactive + break)">
+                    <i class="bi bi-clock-fill"></i>
+                    <div><span class="tc-label">Total</span><span class="tc-value" data-total-nav>00:00:00</span></div>
+                </div>
             </div>
         @endif
         <a href="{{ route('notifications.index') }}" class="btn-icon position-relative" aria-label="Announcements" id="bellLink">
