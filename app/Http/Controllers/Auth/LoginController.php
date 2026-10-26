@@ -41,15 +41,27 @@ class LoginController extends Controller
         return redirect()->intended(route($user->homeRoute()));
     }
 
-    /** Signs out of the website only – an open attendance session stays open. */
-    public function destroy(Request $request, AuditLogger $audit)
+    /**
+     * Employees cannot sign out while punched in — they must punch out first
+     * (which needs the punch-out rules met), or admin can punch them out.
+     */
+    public function destroy(Request $request, AuditLogger $audit, \App\Services\AttendanceService $attendance)
     {
+        $user = $request->user();
+        if ($user && $user->role->portal() === 'employee') {
+            $session = $attendance->todaySession($user);
+            if ($session && $session->isOpen()) {
+                return redirect()->route('employee.attendance.today')
+                    ->with('error', 'You are still punched in. Punch out first to sign out — punch-out opens when your work score reaches 100%. If you must leave early, use Exception Checkout or ask admin.');
+            }
+        }
+
         $audit->log('auth.logout', 'Signed out of the portal');
 
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login')->with('status', 'You have been signed out. Attendance checkout is separate and is not affected.');
+        return redirect()->route('login')->with('status', 'You have been signed out.');
     }
 }

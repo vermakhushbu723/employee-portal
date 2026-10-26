@@ -36,6 +36,13 @@
     </div>
 
     @include('partials.bottom-nav')
+
+    {{-- WhatsApp: QR button + small floating panel that opens / docks / sizes the WhatsApp Web window --}}
+    <a href="https://web.whatsapp.com/" target="_blank" rel="noopener" class="wa-fab" id="waFab" title="WhatsApp" aria-label="Open WhatsApp panel">
+        <i class="bi bi-qr-code-scan"></i>
+        <span class="wa-badge"><i class="bi bi-whatsapp"></i></span>
+    </a>
+    @include('partials.whatsapp-panel')
     @include('partials.install-banner')
     @include('partials.punch-gate')
 
@@ -44,6 +51,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ asset('js/app.js') }}?v={{ filemtime(public_path('js/app.js')) }}"></script>
+    <script src="{{ asset('js/whatsapp-panel.js') }}?v={{ filemtime(public_path('js/whatsapp-panel.js')) }}"></script>
     @stack('scripts')
 </body>
 </html>

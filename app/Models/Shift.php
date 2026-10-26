@@ -10,7 +10,7 @@ class Shift extends Model
 {
     protected $fillable = [
         'name', 'start_time', 'end_time', 'required_minutes',
-        'break_allowed_minutes', 'grace_minutes', 'checkin_opens_minutes', 'is_default',
+        'break_allowed_minutes', 'grace_minutes', 'checkin_opens_minutes', 'is_default', 'is_custom',
     ];
 
     protected function casts(): array

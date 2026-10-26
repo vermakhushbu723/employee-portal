@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Department extends Model
 {
-    protected $fillable = ['name', 'code', 'description', 'status'];
+    protected $fillable = ['name', 'code', 'description', 'status', 'for_data'];
+
+    protected function casts(): array
+    {
+        return ['for_data' => 'boolean'];
+    }
 
     public function employees(): HasMany
     {
@@ -18,7 +23,7 @@ class Department extends Model
     public function scopeForData(\Illuminate\Database\Eloquent\Builder $query): void
     {
         $query->where('status', 'active')
-            ->where(fn ($q) => $q->whereIn('code', ['RE', 'LOAN', 'CC', 'HRR'])
+            ->where(fn ($q) => $q->where('for_data', true)
                 ->orWhereIn('id', LeadBatch::query()->whereNotNull('department_id')->select('department_id')))
             ->orderBy('name');
     }

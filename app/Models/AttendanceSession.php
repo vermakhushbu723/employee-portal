@@ -13,7 +13,7 @@ class AttendanceSession extends Model
         'user_id', 'work_date', 'check_in_at', 'check_out_at', 'status', 'is_late',
         'worked_minutes', 'break_minutes', 'checkout_type', 'checkout_reason',
         'review_status', 'reviewed_by', 'ip_address', 'active_seconds', 'last_heartbeat_at',
-        'leads_created', 'interested_count', 'work_score', 'grade', 'corrected_by', 'correction_note', 'report_sent_at',
+        'leads_created', 'interested_count', 'target_leads', 'target_interested', 'work_score', 'grade', 'corrected_by', 'correction_note', 'report_sent_at', 'calls_made', 'corrected_at',
     ];
 
     protected function casts(): array
@@ -23,6 +23,7 @@ class AttendanceSession extends Model
             'check_in_at' => 'datetime',
             'check_out_at' => 'datetime',
             'last_heartbeat_at' => 'datetime',
+            'corrected_at' => 'datetime',
             'report_sent_at' => 'datetime',
             'work_score' => 'integer',
             'active_seconds' => 'integer',

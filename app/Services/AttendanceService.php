@@ -48,7 +48,7 @@ class AttendanceService
     }
 
     /** Count active (non-idle) time from a browser heartbeat. Idle / on-break heartbeats add nothing. */
-    public function heartbeat(User $user, bool $active): array
+    public function heartbeat(User $user, bool $active, int $maxGap = 45): array
     {
         $session = $this->todaySession($user);
 
@@ -63,7 +63,7 @@ class AttendanceService
             // Heartbeats come every ~20 s. A longer gap means the page was closed or the
             // laptop slept, so that gap is not counted at all.
             $gap = $now->getTimestamp() - $session->last_heartbeat_at->getTimestamp();
-            if ($gap > 0 && $gap <= 45) {
+            if ($gap > 0 && $gap <= $maxGap) {
                 $session->active_seconds += $gap;
             }
         }
@@ -228,7 +228,15 @@ class AttendanceService
         $required = $shift->required_minutes * 60;
         $breakAllowed = $shift->break_allowed_minutes * 60;
 
+        /*
+         * One formula everywhere (dashboard, timer page, status bar, navbar, reports):
+         *   total    = punch-out (or now) − punch-in
+         *   worked   = ACTIVE time only (portal in use; idle > 1 min not counted)
+         *   inactive = total − break − worked
+         *   remaining = shift hours − worked
+         */
         $worked = 0;
+        $total = 0;
         $breakUsed = 0;
         $activeBreak = null;
 
@@ -240,7 +248,8 @@ class AttendanceService
             }
 
             $activeBreak = $session->isOpen() ? $session->activeBreak() : null;
-            $worked = max(0, self::seconds($session->check_in_at, $end) - $breakUsed);
+            $total = self::seconds($session->check_in_at, $end);
+            $worked = min((int) $session->active_seconds, max(0, $total - $breakUsed));
         }
 
         return [
@@ -254,8 +263,11 @@ class AttendanceService
             'shift_label' => $shift->label(),
             'shift_end_at' => $shiftEnd->format('h:i A'),
             'shift_ends_in' => max(0, $shiftEnd->getTimestamp() - $now->getTimestamp()),
+            'shift_over' => $now->gte($shiftEnd),
             'required' => $required,
             'worked' => $worked,
+            'total' => $total,
+            'idle' => max(0, $total - $breakUsed - $worked),
             'remaining' => max(0, $required - $worked),
             'progress' => Duration::percent($worked, $required),
             'break_allowed' => $breakAllowed,

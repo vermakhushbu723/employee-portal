@@ -36,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
                     $activeTimer = [
                         'seconds' => (int) $session->active_seconds,
                         'tracking' => $session->isOpen() && ! $activeBreak,
+                        'on_shift' => $session->isOpen(),
                         'url' => route('employee.activity.heartbeat'),
                         'idle_after' => (int) config('portal.work_score.idle_after_seconds', 60),
                         // for the live idle / break counters in the status bar (epoch seconds)

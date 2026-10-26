@@ -47,7 +47,8 @@ class EmployeeController extends Controller
                 'name' => $data['name'],
                 'email' => $data['email'] ?? null,
                 'mobile' => $data['mobile'] ?? null,
-                'role' => $data['role'],
+                'role' => $request->resolvedRole()[0],
+                'custom_role_id' => $request->resolvedRole()[1],
                 'password' => $data['password'],
             ]);
 
@@ -64,7 +65,7 @@ class EmployeeController extends Controller
         $audit->log('employee.create', "Created account {$user->employee_code} ({$user->name}) as {$user->role->label()}", ['user_id' => $user->id]);
 
         return redirect()->route('admin.employees.index')
-            ->with('success', "Account {$user->employee_code} created as {$user->role->label()} — opens the {$user->role->portal()} portal.");
+            ->with('success', "Account {$user->employee_code} created as {$user->roleLabel()} — opens the {$user->role->portal()} portal.");
     }
 
     public function edit(User $user)
@@ -83,7 +84,8 @@ class EmployeeController extends Controller
                 'name' => $data['name'],
                 'email' => $data['email'] ?? null,
                 'mobile' => $data['mobile'] ?? null,
-                'role' => $data['role'],
+                'role' => $request->resolvedRole()[0],
+                'custom_role_id' => $request->resolvedRole()[1],
             ]);
 
             if (! empty($data['password'])) {
@@ -98,7 +100,7 @@ class EmployeeController extends Controller
         $audit->log('employee.update', "Updated account {$user->employee_code}".($before !== $user->role ? " (role {$before->label()} → {$user->role->label()})" : ''), ['user_id' => $user->id]);
 
         return redirect()->route('admin.employees.index')
-            ->with('success', "{$user->employee_code} updated — role {$user->role->label()}, opens the {$user->role->portal()} portal.");
+            ->with('success', "{$user->employee_code} updated — role {$user->roleLabel()}, opens the {$user->role->portal()} portal.");
     }
 
     public function toggleStatus(Request $request, User $user, AuditLogger $audit)
@@ -124,7 +126,8 @@ class EmployeeController extends Controller
         return [
             'roles' => Role::cases(),
             'departments' => Department::orderBy('name')->get(),
-            'shifts' => Shift::orderBy('start_time')->get(),
+            'shifts' => Shift::where('is_custom', false)->orWhere('id', $editing?->employee?->shift_id)->orderBy('start_time')->get(),
+            'customRoles' => \App\Models\CustomRole::orderBy('name')->get(),
             'managers' => User::whereIn('role', [Role::Manager->value, Role::TeamLeader->value])
                 ->when($editing, fn ($q) => $q->whereKeyNot($editing->id))
                 ->orderBy('name')->get(),

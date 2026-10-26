@@ -7,11 +7,10 @@ use App\Mail\DailyWorkReport;
 use App\Models\AttendanceSession;
 use App\Models\TaskAssignment;
 use App\Models\User;
+use App\Support\MailPool;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
 
 /**
  * Daily work report per employee: shown to their manager and admin,
@@ -65,7 +64,7 @@ class DailyReportService
             return 'disabled';
         }
 
-        if (in_array(config('mail.default'), ['log', 'array'], true)) {
+        if (! MailPool::ready()) {
             Log::info("Daily report for session {$session->id} not mailed: mail is not configured (MAIL_MAILER=".config('mail.default').').');
 
             return 'not_configured';
@@ -82,15 +81,14 @@ class DailyReportService
             return 'no_recipients';
         }
 
-        try {
-            Mail::to($recipients->all())->send(new DailyWorkReport($session, $this->score->forSession($user, $session)));
-            $session->forceFill(['report_sent_at' => now()])->saveQuietly();
+        $mail = new DailyWorkReport($session, $this->score->forSession($user, $session));
 
-            return 'sent';
-        } catch (Throwable $e) {
-            Log::error("Daily report mail failed for session {$session->id}: ".$e->getMessage());
-
+        // Rotates across the alert mailboxes; on an error the next one is tried.
+        if (! MailPool::send($recipients->all(), $mail, "Daily report mail for session {$session->id}")) {
             return 'failed';
         }
+        $session->forceFill(['report_sent_at' => now()])->saveQuietly();
+
+        return 'sent';
     }
 }

@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class User extends Authenticatable
 {
     protected $fillable = [
-        'employee_code', 'name', 'email', 'mobile', 'role', 'status', 'password', 'last_login_at',
+        'employee_code', 'name', 'email', 'mobile', 'role', 'custom_role_id', 'status', 'password', 'last_login_at',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -23,6 +23,12 @@ class User extends Authenticatable
             'role' => Role::class,
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'last_active_at' => 'datetime',
+            'battery_charging' => 'boolean',
+            'latitude' => 'float',
+            'longitude' => 'float',
+            'location_at' => 'datetime',
+            'device_at' => 'datetime',
         ];
     }
 
@@ -36,6 +42,16 @@ class User extends Authenticatable
     public function attendanceSessions(): HasMany
     {
         return $this->hasMany(AttendanceSession::class);
+    }
+
+    public function meetings(): HasMany
+    {
+        return $this->hasMany(Meeting::class);
+    }
+
+    public function locationLogs(): HasMany
+    {
+        return $this->hasMany(LocationLog::class);
     }
 
     public function taskAssignments(): HasMany
@@ -66,6 +82,22 @@ class User extends Authenticatable
     public function lateCheckinRequests(): HasMany
     {
         return $this->hasMany(LateCheckinRequest::class);
+    }
+
+    public function customRole(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(CustomRole::class, 'custom_role_id');
+    }
+
+    public function workAssignments(): HasMany
+    {
+        return $this->hasMany(WorkAssignment::class);
+    }
+
+    /** Role name shown in the UI: the admin-made role if set, else the base role. */
+    public function roleLabel(): string
+    {
+        return $this->customRole?->name ?? $this->role->label();
     }
 
     /* ---------------------------------------------------------------- Helpers */

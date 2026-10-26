@@ -13,6 +13,6 @@
             {{ $announcement->published_at->isToday() ? 'Today' : ($announcement->published_at->isYesterday() ? 'Yesterday' : $announcement->published_at->format('d M Y')) }},
             {{ $announcement->published_at->format('h:i A') }}
         </div>
-        <div class="small text-muted">{{ $announcement->body }}</div>
+        <div class="small text-muted">{!! nl2br(e($announcement->body)) !!}</div>
     </div>
 </div>

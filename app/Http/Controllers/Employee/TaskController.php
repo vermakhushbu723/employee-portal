@@ -35,6 +35,7 @@ class TaskController extends Controller
             'tab' => $tab,
             'tabCounts' => $tabCounts,
             'assignments' => $assignments,
+            'workCards' => app(\App\Services\WorkAssignmentService::class)->cardsFor($user),
             'summary' => [
                 'total' => $assignments->count(),
                 'in_progress' => $assignments->where('status', TaskStatus::InProgress)->count(),

@@ -174,6 +174,15 @@
         if (!fileInput.files.length) { e.preventDefault(); window.liveToast?.({ type: 'alert', title: 'No file', body: 'Choose an Excel or CSV file (step 4).' }); return; }
         if (columns.length && !selected().some((b) => isMobile(b.value))) { e.preventDefault(); window.liveToast?.({ type: 'alert', title: 'Mobile column missing', body: 'Your file needs a Mobile / Phone column.' }); return; }
 
+        // "Upload & Share" needs employees; "Only Upload" puts the data in the pool
+        const btn = e.submitter && e.submitter.name === 'action' ? e.submitter : $('uploadBtn');
+        const onlyUpload = btn.value === 'upload';
+        if (!onlyUpload && !form.querySelector('input[name="users[]"]:checked')) {
+            e.preventDefault();
+            window.liveToast?.({ type: 'alert', title: 'No employee selected', body: 'Select employees in step 2 — or use "Only Upload" to share it later.' });
+            return;
+        }
+
         // Send the sheet as CSV (works for .xls, .xlsx and .csv alike)
         if (sheet && window.XLSX && window.DataTransfer) {
             const csv = XLSX.utils.sheet_to_csv(sheet, { FS: ',', blankrows: false, rawNumbers: true });
@@ -182,10 +191,55 @@
             dt.items.add(new File(['﻿' + csv], name, { type: 'text/csv' }));
             fileInput.files = dt.files;
         }
-        $('uploadBtn').disabled = true;
-        $('uploadBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading…';
+        // A disabled submitter is not sent, so carry the choice in a hidden field
+        let action = form.querySelector('input[type=hidden][name=action]');
+        if (!action) { action = document.createElement('input'); action.type = 'hidden'; action.name = 'action'; form.appendChild(action); }
+        action.value = btn.value;
+        form.querySelectorAll('button[name=action]').forEach((b) => { b.disabled = true; });
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Uploading…';
     });
 
     filterManagers();
     filterEmployees();
+})();
+
+/* Share Unassigned Data: manager filter, employee search, select all, count */
+(() => {
+    const form = document.getElementById('shareForm');
+    if (!form) return;
+    const mgr = form.querySelector('[data-share-manager]');
+    const search = form.querySelector('[data-share-search]');
+    const rows = [...form.querySelectorAll('.share-emp[data-search]')];
+    const all = form.querySelector('[data-share-all]');
+    const count = () => { form.querySelector('[data-share-count]').textContent = form.querySelectorAll('input[name="users[]"]:checked').length; };
+
+    const filter = () => {
+        const m = mgr.value;
+        const q = search.value.trim().toLowerCase();
+        let shown = 0;
+        rows.forEach((r) => {
+            const inTeam = !m || r.dataset.manager === m;
+            const ok = inTeam && (!q || r.dataset.search.includes(q));
+            r.classList.toggle('d-none', !ok);
+            if (!inTeam) r.querySelector('input').checked = false; // other managers' employees are not shared with
+            if (ok) shown++;
+        });
+        form.querySelector('[data-share-empty]').classList.toggle('d-none', shown > 0);
+        all.checked = false;
+        count();
+    };
+
+    mgr.addEventListener('change', filter);
+    search.addEventListener('input', filter);
+    all.addEventListener('change', () => {
+        rows.filter((r) => !r.classList.contains('d-none')).forEach((r) => { r.querySelector('input').checked = all.checked; });
+        count();
+    });
+    form.addEventListener('change', (e) => { if (e.target.name === 'users[]') count(); });
+    form.addEventListener('submit', (e) => {
+        if (!form.querySelector('input[name="users[]"]:checked')) {
+            e.preventDefault();
+            window.liveToast?.({ type: 'alert', title: 'No employee selected', body: 'Select at least one employee to share the data with.' });
+        }
+    });
 })();

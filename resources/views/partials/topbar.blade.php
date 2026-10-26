@@ -18,20 +18,9 @@
             <i class="bi bi-arrow-clockwise"></i>
         </button>
         @if ($activeTimer)
-            {{-- Three running timers: Active (working) · Inactive (no activity > 1 min) · Total (since punch-in) --}}
-            <div class="time-chips d-none d-md-flex" id="activeTimer" data-active-timer='@json($activeTimer)'>
-                <div class="time-chip tone-success" title="Active working time today — counts only while you use the portal">
-                    <span class="dot"></span>
-                    <div><span class="tc-label" data-active-state>Active</span><span class="tc-value" data-active-display>{{ \App\Support\Duration::hms($activeTimer['seconds']) }}</span></div>
-                </div>
-                <div class="time-chip tone-danger" title="Inactive time today — no activity for more than 1 minute, browser closed or device off">
-                    <i class="bi bi-pause-circle-fill"></i>
-                    <div><span class="tc-label">Inactive</span><span class="tc-value" data-idle-nav>00:00:00</span></div>
-                </div>
-                <div class="time-chip tone-primary" title="Total time since punch-in (active + inactive + break)">
-                    <i class="bi bi-clock-fill"></i>
-                    <div><span class="tc-label">Total</span><span class="tc-value" data-total-nav>00:00:00</span></div>
-                </div>
+            {{-- Carries the active-time config for app.js; the Active / Inactive / Total counters are shown in the status bar --}}
+            <div class="d-none" id="activeTimer" data-active-timer='@json($activeTimer)'>
+                <span data-active-state></span><span data-active-display></span>
             </div>
         @endif
         <a href="{{ route('notifications.index') }}" class="btn-icon position-relative" aria-label="Announcements" id="bellLink">
@@ -44,13 +33,13 @@
                 <span class="avatar tone-primary" style="width:34px;height:34px;font-size:.75rem">{{ auth()->user()->initials }}</span>
                 <span class="d-none d-lg-block text-start lh-sm">
                     <span class="d-block fw-600 small">{{ auth()->user()->name }}</span>
-                    <span class="d-block text-muted small-xs">{{ auth()->user()->employee_code }} · {{ auth()->user()->role->label() }}</span>
+                    <span class="d-block text-muted small-xs">{{ auth()->user()->employee_code }} · {{ auth()->user()->roleLabel() }}</span>
                 </span>
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4 p-2">
                 <li class="px-3 py-2 d-lg-none">
                     <div class="fw-600 small">{{ auth()->user()->name }}</div>
-                    <div class="text-muted small-xs">{{ auth()->user()->employee_code }} · {{ auth()->user()->role->label() }}</div>
+                    <div class="text-muted small-xs">{{ auth()->user()->employee_code }} · {{ auth()->user()->roleLabel() }}</div>
                 </li>
                 <li><a class="dropdown-item rounded-3" href="{{ route('profile.show') }}"><i class="bi bi-person me-2"></i>My Profile</a></li>
                 <li><hr class="dropdown-divider"></li>

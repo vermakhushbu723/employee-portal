@@ -7,53 +7,68 @@
 @section('content')
 <div data-live-timer='@json($timer)' data-status-url="{{ route('employee.work-timer.status') }}">
 
-    {{-- Greeting --}}
+    {{-- Greeting + current status --}}
     @php
         $hour = now()->hour;
         $greeting = $hour < 12 ? 'Good Morning' : ($hour < 17 ? 'Good Afternoon' : 'Good Evening');
+        [$stateLabel, $stateTone, $stateIcon] = match (true) {
+            ! $timer['checked_in'] => ['Not Checked In', 'secondary', 'clock'],
+            $timer['checked_out'] => ['Checked Out at '.$timer['check_out_at'], 'primary', 'check2-all'],
+            $timer['on_break'] => ['On Break', 'warning', 'cup-hot-fill'],
+            default => ['Currently Working', 'success', 'circle-fill'],
+        };
     @endphp
     <div class="card-soft card-pad mb-3 hero-card">
-        <div class="hero-greeting">
-            <span class="avatar lg tone-primary">{{ $user->initials }}</span>
-            <div class="min-w-0">
-                <div class="small text-muted">{{ $greeting }},</div>
-                <h2 class="h5 fw-bold mb-0">{{ $user->name }} 👋</h2>
-                <div class="text-muted small">{{ $user->employee_code }} | {{ $user->employee?->designation ?? $user->role->label() }}</div>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <div class="hero-greeting flex-grow-1">
+                <span class="avatar lg tone-primary">{{ $user->initials }}</span>
+                <div class="min-w-0">
+                    <div class="small text-muted">{{ $greeting }},</div>
+                    <h2 class="h5 fw-bold mb-0">{{ $user->name }} 👋</h2>
+                    <div class="text-muted small">{{ $user->employee_code }} | {{ $user->employee?->designation ?? $user->roleLabel() }}</div>
+                </div>
+            </div>
+            <div class="status-banner tone-{{ $stateTone }}">
+                <span class="dot"><i class="bi bi-{{ $stateIcon }} small"></i></span>
+                <div>
+                    {{ $stateLabel }}
+                    <small>
+                        @if ($timer['on_break']) Since {{ $timer['break_started_at'] }}
+                        @elseif ($timer['checked_in'] && ! $timer['checked_out']) Since {{ $timer['check_in_at'] }}
+                        @else Shift {{ $timer['shift_label'] }} @endif
+                    </small>
+                </div>
+                @unless ($timer['checked_in'])
+                    <div class="ms-2">
+                        @include('employee.attendance.partials.checkin-action', ['checkIn' => $checkIn, 'compact' => true])
+                    </div>
+                @endunless
             </div>
         </div>
 
-        @php
-            [$stateLabel, $stateTone, $stateIcon] = match (true) {
-                ! $timer['checked_in'] => ['Not Checked In', 'secondary', 'clock'],
-                $timer['checked_out'] => ['Checked Out at '.$timer['check_out_at'], 'primary', 'check2-all'],
-                $timer['on_break'] => ['On Break', 'warning', 'cup-hot-fill'],
-                default => ['Currently Working', 'success', 'circle-fill'],
-            };
-        @endphp
-        <div class="status-banner tone-{{ $stateTone }} mt-3">
-            <span class="dot"><i class="bi bi-{{ $stateIcon }} small"></i></span>
-            <div>
-                {{ $stateLabel }}
-                <small>
-                    @if ($timer['on_break']) Since {{ $timer['break_started_at'] }}
-                    @elseif ($timer['checked_in']) Since {{ $timer['check_in_at'] }}
-                    @else Shift {{ $timer['shift_label'] }} @endif
-                </small>
-            </div>
-            @unless ($timer['checked_in'])
-                <div class="ms-auto text-end">
-                    @include('employee.attendance.partials.checkin-action', ['checkIn' => $checkIn, 'compact' => true])
-                </div>
-            @endunless
+        {{-- Settings from the employee profile (set by admin) --}}
+        <div class="setting-chips mt-3">
+            <span class="setting-chip"><i class="bi bi-person-badge"></i>Role <b>{{ $user->roleLabel() }}</b></span>
+            <span class="setting-chip"><i class="bi bi-clock"></i>Shift <b>{{ $shift->label() }}</b> · {{ Duration::hm($shift->required_minutes * 60) }}</span>
+            <span class="setting-chip"><i class="bi bi-cup-hot"></i>Break <b>{{ $shift->break_allowed_minutes }} min</b></span>
+            <span class="setting-chip">
+                <i class="bi bi-bullseye"></i>Today's Target
+                <b>{{ $targets['leads'] }} leads</b>@if ($targets['extra']['leads'])<span class="extra">(+{{ $targets['extra']['leads'] }} task)</span>@endif
+                · <b>{{ $targets['interested'] }} interested</b>@if ($targets['extra']['interested'])<span class="extra">(+{{ $targets['extra']['interested'] }} file)</span>@endif
+            </span>
         </div>
     </div>
+
+    @if ($training)
+        @include('employee.partials.training-status', ['training' => $training])
+    @endif
 
     <div data-live-region="leads">
         @if ($score)
             @php
                 [$lvl, $gradeLabel, $gradeTone] = \App\Services\WorkScoreService::battery($score['grade']);
                 $scoreParts = [
-                    ['Active time', \App\Support\Duration::hm($score['active']).' / '.\App\Support\Duration::hm($score['required']), $score['parts']['time'], 'success'],
+                    ['Active time', Duration::hm($score['active']).' / '.Duration::hm($score['required']), $score['parts']['time'], 'success'],
                     ['Leads created', $score['created'].' / '.$score['targets']['leads'], $score['parts']['leads'], 'primary'],
                     ['Interested / Mature', $score['interested'].' / '.$score['targets']['interested'], $score['parts']['interested'], 'warning'],
                 ];
@@ -82,66 +97,28 @@
             </div>
         @endif
 
-        @if ($newData > 0)
+        <div class="section-head">
+            <h3 class="section-title">My Assigned Work</h3>
+            <a href="{{ route('employee.tasks.index') }}" class="small fw-600">View All</a>
+        </div>
+        @if ($workCards->isEmpty() && $newData > 0)
             <a href="{{ route('employee.leads.index', ['tab' => 'new']) }}" class="status-banner tone-info mb-3 text-decoration-none">
                 <span class="dot"><i class="bi bi-stars small"></i></span>
-                <div>
-                    {{ $newData }} new lead(s) to call
-                    <small>Data shared by admin — open My Leads → New Data</small>
-                </div>
+                <div>{{ $newData }} new lead(s) to call <small>Data shared with you — open My Leads → New Data</small></div>
                 <span class="ms-auto btn btn-sm btn-primary text-nowrap">Start Calling</span>
             </a>
+        @else
+            @include('employee.partials.work-cards', ['cards' => $workCards])
         @endif
-    </div>
 
-    <div class="d-flex align-items-center gap-2 text-muted mb-3 small fw-600">
-        <i class="bi bi-calendar3"></i> Today, {{ now()->format('d M Y') }}
-    </div>
-
-    <div class="row g-3">
-        {{-- Time tiles --}}
-        <div class="col-lg-7">
-            <div class="row g-3">
-                <div class="col-6">
-                    <x-stat-tile icon="clock" label="Login Time" tone="primary" :value="$timer['check_in_at'] ?? '--:--'" />
-                </div>
-                <div class="col-6">
-                    <x-stat-tile icon="play-circle" label="Work Time" tone="success"><span data-bind="worked:hm">{{ Duration::hm($timer['worked']) }}</span></x-stat-tile>
-                </div>
-                <div class="col-6">
-                    <x-stat-tile icon="cup-hot" label="Break Time" tone="warning"><span data-bind="break_used:hm">{{ Duration::hm($timer['break_used']) }}</span></x-stat-tile>
-                </div>
-                <div class="col-6">
-                    <x-stat-tile icon="hourglass-split" label="Remaining" tone="danger"><span data-bind="remaining:hm">{{ Duration::hm($timer['remaining']) }}</span></x-stat-tile>
-                </div>
-            </div>
-
-            {{-- Task progress --}}
-            <div class="card-soft card-pad mt-3">
+        @if ($assignments->isNotEmpty())
+            <div class="card-soft card-pad mb-3">
                 <div class="section-head">
-                    <h3 class="section-title">Task Progress (Today)</h3>
-                    <span class="fw-bold">{{ $work['progress'] }}%</span>
+                    <h3 class="section-title">Other Tasks Today</h3>
+                    <span class="small fw-bold">{{ $work['completed'] }} / {{ $work['target'] }} · {{ $work['progress'] }}%</span>
                 </div>
-                <x-progress :value="$work['progress']" tone="success" />
-                <div class="row g-3 mt-1">
-                    <div class="col-6"><x-stat-tile class="plain" icon="clipboard-check" label="Completed" tone="success" :value="$work['completed']" /></div>
-                    <div class="col-6"><x-stat-tile class="plain" icon="hourglass" label="Pending" tone="warning" :value="$work['pending']" /></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-5">
-            {{-- Today's targets --}}
-            <div class="card-soft card-pad h-100">
-                <div class="section-head">
-                    <h3 class="section-title">Today's Targets</h3>
-                    <a href="{{ route('employee.tasks.index') }}" class="small fw-600">View All</a>
-                </div>
-
-                @forelse ($assignments as $assignment)
-                    @php
-                        $meta = $assignment->task->categoryMeta();
-                    @endphp
+                @foreach ($assignments as $assignment)
+                    @php $meta = $assignment->task->categoryMeta(); @endphp
                     <a href="{{ route('employee.tasks.show', $assignment) }}" class="list-row list-row-link">
                         <span class="icon-box sm soft tone-{{ $meta['tone'] }}"><i class="bi bi-{{ $meta['icon'] }}"></i></span>
                         <div class="flex-grow-1 min-w-0">
@@ -152,44 +129,16 @@
                             <x-progress class="mt-2" :value="$assignment->progress()" :tone="$meta['tone']" />
                         </div>
                     </a>
-                @empty
-                    <x-empty-state icon="clipboard" title="No work assigned today" text="New tasks from your manager will appear here." />
-                @endforelse
+                @endforeach
             </div>
-        </div>
+        @endif
+    </div>
 
-        {{-- Quick actions + logout status --}}
-        <div class="col-12">
-            <div class="card-soft card-pad">
-                <div class="section-head">
-                    <h3 class="section-title">Quick Actions</h3>
-                    <x-badge :tone="$eligibility['allowed'] ? 'success' : 'danger'">
-                        <i class="bi bi-{{ $eligibility['allowed'] ? 'unlock' : 'lock' }}-fill"></i>
-                        Checkout {{ $eligibility['allowed'] ? 'Allowed' : 'Locked' }}
-                    </x-badge>
-                </div>
-                @php
-                    $actions = [
-                        ['employee.attendance.today', 'fingerprint', 'Attendance', 'success'],
-                        ['employee.tasks.index', 'briefcase', 'View Work', 'primary'],
-                        ['employee.breaks.index', 'cup-hot', 'Break', 'warning'],
-                        ['employee.leads.create', 'person-plus', 'New Lead', 'purple'],
-                        ['employee.performance', 'bar-chart-line', 'Performance', 'info'],
-                        ['employee.attendance.history', 'calendar3', 'My Attendance', 'danger'],
-                    ];
-                @endphp
-                <div class="row g-2">
-                    @foreach ($actions as [$route, $icon, $label, $tone])
-                        <div class="col-4 col-md-2">
-                            <a href="{{ route($route) }}" class="d-flex flex-column align-items-center gap-2 p-2 rounded-3 text-center text-dark small fw-600">
-                                <span class="icon-box soft tone-{{ $tone }}"><i class="bi bi-{{ $icon }}"></i></span>
-                                {{ $label }}
-                            </a>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        </div>
+    <div class="d-flex justify-content-end">
+        <x-badge :tone="$eligibility['allowed'] ? 'success' : 'danger'">
+            <i class="bi bi-{{ $eligibility['allowed'] ? 'unlock' : 'lock' }}-fill"></i>
+            Punch-out {{ $eligibility['allowed'] ? 'Allowed' : 'Locked' }}
+        </x-badge>
     </div>
 </div>
 @endsection

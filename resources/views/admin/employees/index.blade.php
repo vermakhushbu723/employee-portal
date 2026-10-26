@@ -26,7 +26,7 @@
                 <span class="avatar tone-{{ $user->isActive() ? 'primary' : 'secondary' }}">{{ $user->initials }}</span>
                 <div class="flex-grow-1 min-w-0">
                     <div class="list-title text-truncate">{{ $user->name }}</div>
-                    <div class="small-xs text-muted">{{ $user->employee_code }} · {{ $user->role->label() }}</div>
+                    <div class="small-xs text-muted">{{ $user->employee_code }} · {{ $user->roleLabel() }}</div>
                     <div class="small-xs text-muted text-truncate">{{ $user->employee?->department?->name ?? '—' }} · Mgr: {{ $user->employee?->manager?->name ?? '—' }}</div>
                 </div>
                 <div class="text-end">
@@ -64,7 +64,7 @@
                             </div>
                         </td>
                         <td>
-                            {{ $user->role->label() }}
+                            {{ $user->roleLabel() }}
                             <div class="small-xs text-muted">{{ ucfirst($user->role->portal()) }} portal</div>
                         </td>
                         <td>{{ $user->employee?->department?->name ?? '—' }}</td>

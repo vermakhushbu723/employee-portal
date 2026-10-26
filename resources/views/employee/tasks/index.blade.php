@@ -4,6 +4,11 @@
 @section('back', route('employee.dashboard'))
 
 @section('content')
+<div data-live-region="leads">
+    @include('employee.partials.work-cards', ['cards' => $workCards])
+</div>
+
+<h3 class="section-title mb-2">Other Tasks</h3>
 <nav class="seg-tabs mb-3">
     @foreach (['today' => 'Today', 'week' => 'This Week', 'all' => 'All Tasks'] as $key => $label)
         <a href="{{ route('employee.tasks.index', ['tab' => $key]) }}" @class(['active' => $tab === $key])>

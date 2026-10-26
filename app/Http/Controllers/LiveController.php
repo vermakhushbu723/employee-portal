@@ -47,6 +47,11 @@ class LiveController extends Controller
             $versions['late'] = md5(LateCheckinRequest::where('status', LeaveStatus::Pending)->count().'|'.LateCheckinRequest::max('updated_at'));
         }
 
+        // Live status dashboards (admin / manager): refresh about every 30 s, or at once when a meeting or correction changes
+        if (in_array($user->role->portal(), ['admin', 'manager'], true)) {
+            $versions['status'] = md5(intdiv(time(), 30).'|'.\App\Models\Meeting::max('updated_at').'|'.\App\Models\WorkCorrection::max('updated_at'));
+        }
+
         return response()->json([
             'alerts' => (clone $visible)->where('published_at', '>=', now()->subDays(7))->count(),
             'latest_id' => (int) (clone $visible)->max('id'),

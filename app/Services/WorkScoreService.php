@@ -22,7 +22,10 @@ use Carbon\CarbonInterface;
  */
 class WorkScoreService
 {
-    public function targets(User $user): array
+    public function __construct(private WorkAssignmentService $assignments) {}
+
+    /** Daily targets set by admin / manager (without task extras). */
+    public function baseTargets(User $user): array
     {
         $defaults = config('portal.work_score.default_targets');
         $set = $user->targets()->where('period', 'daily')->pluck('target_value', 'metric');
@@ -30,6 +33,24 @@ class WorkScoreService
         return [
             'leads' => (int) ($set['leads'] ?? $defaults['leads']),
             'interested' => (int) ($set['interested'] ?? $defaults['interested']),
+        ];
+    }
+
+    /**
+     * Today's targets = base daily targets + targets of open work tasks
+     * (shared file's interested target, lead-creation task's lead target)
+     * — the increase stays until that work is finished.
+     */
+    public function targets(User $user): array
+    {
+        $base = $this->baseTargets($user);
+        $extra = $this->assignments->openTargets($user);
+
+        return [
+            'leads' => $base['leads'] + $extra['leads'],
+            'interested' => $base['interested'] + $extra['interested'],
+            'base' => $base,
+            'extra' => $extra,
         ];
     }
 
@@ -52,10 +73,13 @@ class WorkScoreService
     {
         $shift = $user->currentShift();
         $required = max(1, $shift->required_minutes * 60);
-        $targets = $this->targets($user);
         $date = $session->work_date;
 
         $live = $session->grade === null;
+        // Closed days keep the targets they had that day
+        $targets = (! $live && $session->target_leads !== null)
+            ? ['leads' => (int) $session->target_leads, 'interested' => (int) $session->target_interested]
+            : $this->targets($user);
         $created = $live ? $this->leadsCreated($user, $date) : $session->leads_created;
         $interested = $live ? $this->interestedCount($user, $date) : $session->interested_count;
         $active = (int) $session->active_seconds;
@@ -145,6 +169,8 @@ class WorkScoreService
         $session->fill([
             'leads_created' => $data['created'],
             'interested_count' => $data['interested'],
+            'target_leads' => $data['targets']['leads'],
+            'target_interested' => $data['targets']['interested'],
             'work_score' => $data['score'],
             'grade' => $data['grade'],
             'status' => self::statusForGrade($data['grade'], (bool) $session->is_late),

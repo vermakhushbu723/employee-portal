@@ -3,6 +3,8 @@
 @section('title', 'Assign Work')
 
 @section('content')
+@include('partials.lead-task-form', ['taskAction' => route('manager.lead-task'), 'taskUsers' => $team])
+
 <form method="POST" action="{{ route('manager.assign-work.store') }}" class="row g-3" novalidate>
     @csrf
     <div class="col-lg-8">

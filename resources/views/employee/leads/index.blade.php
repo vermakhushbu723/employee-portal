@@ -43,6 +43,7 @@
 
 <form method="GET" class="card-soft card-pad mb-3 d-flex flex-wrap gap-2">
     <input type="hidden" name="tab" value="{{ $tab }}">
+    @if ($batch)<input type="hidden" name="batch" value="{{ $batch->id }}">@endif
     <div class="input-icon flex-grow-1">
         <i class="bi bi-search"></i>
         <input type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Search name, mobile or city">
@@ -52,6 +53,9 @@
 </form>
 
 <div class="card-soft card-pad" data-live-region="leads">
+    @if ($batch)
+        <div class="info-box mb-2"><i class="bi bi-file-earmark-spreadsheet-fill"></i><div class="flex-grow-1">Showing leads from file <b>{{ $batch->file_name ?: $batch->name ?: 'Shared data' }}</b>.</div><a href="{{ route('employee.leads.index', ['tab' => $tab]) }}" class="fw-600 text-nowrap">Show all</a></div>
+    @endif
     @if ($tab === 'today')
         <div class="info-box mb-2"><i class="bi bi-info-circle-fill"></i><div>Today's work: new data not called yet + follow-ups due today or earlier.</div></div>
     @endif

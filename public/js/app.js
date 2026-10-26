@@ -34,10 +34,14 @@
             if (s.on_break) {
                 s.break_used++;
                 s.break_remaining = Math.max(0, s.break_allowed - s.break_used);
-            } else {
+            } else if (!window.portalActivity || window.portalActivity.isActive()) {
+                // "Worked" = active time only (same rule as the navbar timer)
                 s.worked++;
                 s.remaining = Math.max(0, s.required - s.worked);
+            } else {
+                s.idle = (s.idle || 0) + 1;
             }
+            if (s.total !== undefined) s.total++;
             s.shift_ends_in = Math.max(0, s.shift_ends_in - 1);
             this.render();
         }
@@ -117,10 +121,17 @@
         sync();
     });
 
-    // Employee form: warn when an admin-portal role (HR / Super Admin) is chosen.
+    // Employee form: custom shift fields appear when "+ Custom shift" is chosen.
+    document.querySelectorAll('[data-custom-shift]').forEach((select) => {
+        const box = document.querySelector(select.dataset.customShift);
+        select.addEventListener('change', () => box.classList.toggle('d-none', select.value !== 'custom'));
+    });
+
+    // Employee form: warn when an admin-portal role (HR / Super Admin, or a custom role based on them) is chosen.
     document.querySelectorAll('[data-role-warning]').forEach((select) => {
         const warning = document.querySelector(select.dataset.roleWarning);
-        const sync = () => warning.classList.toggle('d-none', !['hr', 'super_admin'].includes(select.value));
+        const base = () => select.selectedOptions[0]?.dataset.base || select.value;
+        const sync = () => warning.classList.toggle('d-none', !['hr', 'super_admin'].includes(base()));
         select.addEventListener('change', sync);
         sync();
     });
@@ -156,7 +167,7 @@
             el.setAttribute('role', 'status');
             el.innerHTML = `<div class="toast-body d-flex gap-2 align-items-start">
                 <span class="icon-box sm tone-${n.type === 'alert' ? 'warning' : 'primary'}"><i class="bi bi-${icon}"></i></span>
-                <div class="flex-grow-1 min-w-0"><div class="fw-bold">${escapeHtml(n.title)}</div><div class="small text-muted">${escapeHtml(n.body)}</div></div>
+                <div class="flex-grow-1 min-w-0"><div class="fw-bold">${escapeHtml(n.title)}</div><div class="small text-muted">${escapeHtml(n.body).split('\n').join('<br>')}</div></div>
                 <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
             box.appendChild(el);
             el.addEventListener('hidden.bs.toast', () => el.remove());
@@ -188,6 +199,7 @@
                 fresh[i].classList.add('live-updated');
                 setTimeout(() => fresh[i].classList.remove('live-updated'), 1600);
             });
+            document.dispatchEvent(new CustomEvent('live:updated', { detail: { key } }));
             return true;
         };
 
@@ -270,7 +282,7 @@
     }, true);
 
     /* ------------------------------------------------------------------ Active time (navbar) */
-    // Counts only while the employee is active: any mouse/keyboard/touch/scroll in the last 5 minutes.
+    // Counts only while the employee is active: any mouse/keyboard/touch/scroll in the last minute (in any portal tab).
     // The server keeps the real total; the browser sends a heartbeat every 20 s.
     const activeEl = document.getElementById('activeTimer');
     if (activeEl) {
@@ -284,10 +296,24 @@
         let tracking = cfg.tracking;
         let lastActivity = Date.now();
 
-        ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'].forEach((ev) =>
-            window.addEventListener(ev, () => { lastActivity = Date.now(); }, { passive: true }));
+        // Activity is shared by every open portal tab (localStorage), so a hidden second tab
+        // does not mark the employee idle while they work in another tab.
+        const store = {
+            get: (k) => { try { return Number(localStorage.getItem(k)) || 0; } catch (e) { return 0; } },
+            set: (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { /* private mode */ } },
+        };
+        const touch = () => {
+            const now = Date.now();
+            if (now - lastActivity > 1000) store.set('portal:lastActivity', now);
+            lastActivity = now;
+        };
+        ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel', 'input', 'focus'].forEach((ev) =>
+            window.addEventListener(ev, touch, { passive: true }));
+        touch();
 
-        const isActive = () => tracking && !document.hidden && Date.now() - lastActivity < IDLE_AFTER;
+        const lastSeen = () => Math.max(lastActivity, store.get('portal:lastActivity'));
+        const isActive = () => tracking && Date.now() - lastSeen() < IDLE_AFTER;
+        window.portalActivity = { isActive };
         const render = () => {
             display.textContent = fmt.hms(seconds);
             const active = isActive();
@@ -313,22 +339,63 @@
             }
         };
 
-        const beat = async () => {
+        // Device status for the admin / manager live dashboards: battery + location (asked while punched in)
+        const device = { type: (matchMedia('(pointer: coarse)').matches || /Mobi|Android|iPhone/i.test(navigator.userAgent)) ? 'mobile' : 'desktop', battery: null, pos: null, geo: null };
+        if (navigator.getBattery) navigator.getBattery().then((b) => { device.battery = b; }).catch(() => {});
+        let geoWatch = null;
+        const geoNotice = (show) => {
+            let el = document.getElementById('geoNotice');
+            if (!show) { el?.remove(); return; }
+            if (el) return;
+            el = document.createElement('div');
+            el.id = 'geoNotice';
+            el.className = 'geo-notice';
+            el.innerHTML = '<i class="bi bi-geo-alt-fill"></i><div><b>Location access is off.</b> Allow location for this site in your browser settings — your manager sees it on the live dashboard.</div><button type="button" class="btn-close btn-sm" aria-label="Close"></button>';
+            el.querySelector('button').addEventListener('click', () => el.remove());
+            document.body.appendChild(el);
+        };
+        const startGeo = () => {
+            if (geoWatch !== null) return;
+            if (!navigator.geolocation) { device.geo = 'unsupported'; return; }
+            geoWatch = navigator.geolocation.watchPosition(
+                (p) => { device.pos = p.coords; device.geo = 'ok'; geoNotice(false); },
+                (err) => { if (err.code === 1) { device.geo = 'denied'; geoNotice(true); } },
+                { enableHighAccuracy: device.type === 'mobile', maximumAge: 60000, timeout: 30000 },
+            );
+        };
+        const stopGeo = () => { if (geoWatch !== null) { navigator.geolocation.clearWatch(geoWatch); geoWatch = null; } };
+        const deviceParams = () => {
+            const p = { device: device.type };
+            if (device.battery) { p.battery = Math.round(device.battery.level * 100); p.charging = device.battery.charging ? 1 : 0; }
+            if (device.geo) p.geo = device.geo;
+            if (device.pos) { p.lat = device.pos.latitude.toFixed(7); p.lng = device.pos.longitude.toFixed(7); p.accuracy = Math.round(device.pos.accuracy); }
+            return p;
+        };
+        if (cfg.tracking || cfg.on_shift) startGeo();
+
+        const beat = async (force = false) => {
+            // One heartbeat per ~20 s across all tabs: an "idle" beat from a hidden tab must not
+            // reset the time an active tab is about to report.
+            if (!force && Date.now() - store.get('portal:beatAt') < 18000) {
+                return;
+            }
+            store.set('portal:beatAt', Date.now());
             try {
-                const body = new URLSearchParams({ _token: csrf(), active: isActive() ? 1 : 0 });
+                const body = new URLSearchParams({ _token: csrf(), active: isActive() ? 1 : 0, ...deviceParams() });
                 const res = await fetch(cfg.url, { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
                 if (!res.ok) return;
                 const data = await res.json();
                 seconds = data.active_seconds;
                 tracking = data.tracking;
+                if (data.tracking || data.on_break) startGeo(); else stopGeo();
                 render();
             } catch (e) { /* offline */ }
         };
 
         setInterval(() => { if (isActive()) seconds++; render(); }, 1000);
-        setInterval(beat, 20000);
-        beat();
-        document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastActivity = Date.now(); beat(); } });
+        setInterval(beat, 5000); // checks often, sends only when ~20 s have passed since any tab's beat
+        beat(true);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) { touch(); beat(); } });
         render();
     }
 

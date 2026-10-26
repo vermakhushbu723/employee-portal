@@ -10,11 +10,15 @@
     <label class="small fw-600 me-1" for="reportDate">Date</label>
     <input type="date" id="reportDate" name="date" value="{{ $date->toDateString() }}" max="{{ today()->toDateString() }}" class="form-control w-auto" onchange="this.form.submit()">
     <span class="small text-muted">{{ $date->format('l, d M Y') }}</span>
+    <div class="input-icon ms-lg-3">
+        <i class="bi bi-search"></i>
+        <input type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Name or employee ID">
+    </div>
     <span class="ms-auto"></span>
     @if ($isAdmin)
         <a href="{{ request()->fullUrlWithQuery(['export' => 1]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> Download</a>
     @else
-        <span class="small text-muted"><i class="bi bi-eye"></i> View only — reports can be downloaded by admin</span>
+        <span class="small text-muted"><i class="bi bi-eye"></i> Wrong data? Use <b>Correct</b> — it goes to review before it changes.</span>
     @endif
 </form>
 
@@ -36,7 +40,7 @@
                 <tr>
                     <th>Employee</th><th>In / Out</th><th>Active</th><th>Idle</th><th>Break</th>
                     <th>Leads</th><th>Interested</th><th>Tasks</th><th style="min-width:150px">Work Score</th>
-                    @if ($isAdmin)<th></th>@endif
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -71,27 +75,29 @@
                                 @if ($s->correction_note)<div class="small-xs text-muted mt-1"><i class="bi bi-pencil"></i> {{ $s->correction_note }}</div>@endif
                                 @if ($s->report_sent_at)<div class="small-xs text-success"><i class="bi bi-envelope-check"></i> mailed {{ $s->report_sent_at->format('h:i A') }}</div>@endif
                             </td>
-                            @if ($isAdmin)
-                                <td class="text-end text-nowrap">
-                                    @if ($s->isOpen())
+                            <td class="text-end text-nowrap">
+                                @if ($s->isOpen())
+                                    @if ($isAdmin)
                                         <form method="POST" action="{{ route('admin.reports.punch-out', $s) }}" class="d-inline" data-confirm="Punch out {{ $row['user']->name }} now?">
                                             @csrf
                                             <button class="btn btn-sm btn-outline-danger">Punch out</button>
                                         </form>
                                     @else
-                                        <button type="button" class="btn btn-sm btn-outline-primary" data-modal="#correctModal"
-                                                data-action="{{ route('admin.reports.correct', $s) }}"
-                                                data-fill='@json(['employee' => $row['user']->name.' — '.$date->format('d M Y'), 'grade' => $w['grade'], 'note' => $s->correction_note])'>Correct</button>
+                                        <span class="small-xs text-muted">Working</span>
+                                    @endif
+                                @else
+                                    <a href="{{ route(($isAdmin ? 'admin' : 'manager').'.corrections.create', $s) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Correct</a>
+                                    @if ($isAdmin)
                                         <form method="POST" action="{{ route('admin.reports.send', $s) }}" class="d-inline">
                                             @csrf
                                             <button class="btn btn-sm btn-light" title="E-mail this report"><i class="bi bi-envelope"></i></button>
                                         </form>
                                     @endif
-                                </td>
-                            @endif
+                                @endif
+                            </td>
                         @else
                             <td colspan="8" class="text-muted small">{{ $date->isToday() ? 'Not punched in yet' : 'No attendance (absent / leave / weekly off)' }}</td>
-                            @if ($isAdmin)<td></td>@endif
+                            <td></td>
                         @endif
                     </tr>
                 @empty
@@ -102,36 +108,4 @@
     </div>
 </div>
 
-@if ($isAdmin)
-    <div class="modal fade" id="correctModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <form method="POST" action="" class="modal-content rounded-4 border-0">
-                @csrf
-                <div class="modal-header border-0">
-                    <div>
-                        <h5 class="modal-title fw-bold mb-0">Correct Attendance</h5>
-                        <div class="small text-muted" data-field="employee"></div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body pt-0">
-                    <label class="form-label required">Attendance for the day</label>
-                    <select name="grade" class="form-select mb-3">
-                        <option value="full">Full Day</option>
-                        <option value="half">Half Day</option>
-                        <option value="quarter">Quarter Day</option>
-                        <option value="none">Absent</option>
-                    </select>
-                    <label class="form-label required">Reason / note</label>
-                    <textarea name="note" rows="2" maxlength="500" class="form-control" required placeholder="e.g. Field visit approved by manager"></textarea>
-                    <div class="small text-muted mt-2">The updated report is e-mailed to the employee and their manager.</div>
-                </div>
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary">Save Correction</button>
-                </div>
-            </form>
-        </div>
-    </div>
-@endif
 @endsection

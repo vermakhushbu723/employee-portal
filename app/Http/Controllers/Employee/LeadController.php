@@ -22,6 +22,8 @@ class LeadController extends Controller
         $tabs = ['all', 'today', ...array_map(fn ($s) => $s->value, LeadStatus::cases())];
         $tab = in_array($request->query('tab'), $tabs, true) ? $request->query('tab') : 'all';
         $search = trim((string) $request->query('q'));
+        // "Start Calling" on a work card opens only that shared file's leads
+        $batch = $request->integer('batch') ? \App\Models\LeadBatch::find($request->integer('batch')) : null;
 
         $counts = Lead::ownedBy($user)
             ->selectRaw('status, count(*) as total')
@@ -34,6 +36,7 @@ class LeadController extends Controller
             ->orWhere(fn ($q) => $q->where('status', LeadStatus::FollowUp->value)->whereDate('follow_up_date', '<=', today())));
 
         $leads = Lead::ownedBy($user)
+            ->when($batch, fn ($q) => $q->where('batch_id', $batch->id))
             ->when($tab === 'today', $todayTask)
             ->when(! in_array($tab, ['all', 'today'], true), fn ($q) => $q->where('status', $tab))
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
@@ -50,6 +53,7 @@ class LeadController extends Controller
         return view('employee.leads.index', [
             'leads' => $leads,
             'tab' => $tab,
+            'batch' => $batch,
             'counts' => $counts,
             'total' => $counts->sum(),
             'todayCount' => $todayTask(Lead::ownedBy($user))->count(),

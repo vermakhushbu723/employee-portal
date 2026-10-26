@@ -8,7 +8,7 @@
     <span class="avatar tone-primary">{{ $user->initials }}</span>
     <div>
         <div class="fw-bold">{{ $user->name }}</div>
-        <div class="small text-muted">{{ $user->employee_code }} · currently {{ $user->role->label() }} ({{ ucfirst($user->role->portal()) }} portal)</div>
+        <div class="small text-muted">{{ $user->employee_code }} · currently {{ $user->roleLabel() }} ({{ ucfirst($user->role->portal()) }} portal)</div>
     </div>
 </div>
 

@@ -14,8 +14,8 @@
             <span class="avatar xl">{{ $user->initials }}</span>
             <div class="min-w-0">
                 <h2 class="h4 fw-bold mb-0">{{ $user->name }}</h2>
-                <div class="opacity-75">{{ $user->role->label() }}</div>
-                <div class="opacity-75 small">{{ $user->employee_code }} | {{ $user->employee?->designation ?? $user->role->label() }}</div>
+                <div class="opacity-75">{{ $user->roleLabel() }}</div>
+                <div class="opacity-75 small">{{ $user->employee_code }} | {{ $user->employee?->designation ?? $user->roleLabel() }}</div>
                 <span class="badge rounded-pill bg-success mt-2"><i class="bi bi-check-circle me-1"></i>{{ ucfirst($user->status) }}</span>
             </div>
         </div>

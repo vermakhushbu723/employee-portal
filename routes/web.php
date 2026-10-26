@@ -8,7 +8,10 @@ use App\Http\Controllers\Employee;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\Manager;
+use App\Http\Controllers\MeetingAdminController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\WorkCorrectionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -98,6 +101,18 @@ Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
         Route::get('leave-charges', [Employee\LeaveController::class, 'charges'])->name('leaves.charges');
 
         Route::get('performance', Employee\PerformanceController::class)->name('performance');
+
+        // Customer meetings: book, accept / decline, join (In Meeting), end
+        Route::controller(Employee\MeetingController::class)->prefix('meetings')->name('meetings.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::patch('{meeting}', 'update')->whereNumber('meeting')->name('update');
+            Route::post('{meeting}/accept', 'accept')->whereNumber('meeting')->name('accept');
+            Route::post('{meeting}/decline', 'decline')->whereNumber('meeting')->name('decline');
+            Route::post('{meeting}/join', 'join')->whereNumber('meeting')->name('join');
+            Route::get('{meeting}/room', 'room')->whereNumber('meeting')->name('room');
+            Route::post('{meeting}/end', 'end')->whereNumber('meeting')->name('end');
+        });
     });
 
 /*
@@ -112,9 +127,25 @@ Route::middleware(['auth', 'role:manager,team_leader'])
         Route::get('dashboard', Manager\DashboardController::class)->name('dashboard');
         Route::get('team', Manager\TeamController::class)->name('team');
 
+        // Live tracking, meetings and work-data corrections (same screens for admin and manager)
+        Route::get('tracking', TrackingController::class)->name('tracking');
+        Route::get('meetings', [MeetingAdminController::class, 'index'])->name('meetings.index');
+        Route::post('meetings', [MeetingAdminController::class, 'store'])->name('meetings.store');
+        Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
+        Route::controller(WorkCorrectionController::class)->prefix('corrections')->name('corrections.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('new/{session}', 'create')->whereNumber('session')->name('create');
+            Route::post('new/{session}', 'store')->whereNumber('session')->name('store');
+            Route::get('{correction}', 'show')->whereNumber('correction')->name('show');
+            Route::post('{correction}/approve', 'approve')->whereNumber('correction')->name('approve');
+            Route::post('{correction}/reject', 'reject')->whereNumber('correction')->name('reject');
+        });
+
         Route::get('reports/daily', [DailyWorkReportController::class, 'index'])->name('reports.daily');   // own team, view only
         Route::get('targets', [Manager\TargetController::class, 'index'])->name('targets');
         Route::post('targets', [Manager\TargetController::class, 'update'])->name('targets.update');
+
+        Route::post('lead-task', [Admin\DataController::class, 'leadTask'])->name('lead-task');   // own team only
 
         Route::get('assign-work', [Manager\AssignWorkController::class, 'create'])->name('assign-work.create');
         Route::post('assign-work', [Manager\AssignWorkController::class, 'store'])->name('assign-work.store');
@@ -138,6 +169,20 @@ Route::middleware(['auth', 'role:super_admin,hr'])
     ->group(function () {
         Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
 
+        // Live tracking, meetings and work-data corrections (same screens for admin and manager)
+        Route::get('tracking', TrackingController::class)->name('tracking');
+        Route::get('meetings', [MeetingAdminController::class, 'index'])->name('meetings.index');
+        Route::post('meetings', [MeetingAdminController::class, 'store'])->name('meetings.store');
+        Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
+        Route::controller(WorkCorrectionController::class)->prefix('corrections')->name('corrections.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('new/{session}', 'create')->whereNumber('session')->name('create');
+            Route::post('new/{session}', 'store')->whereNumber('session')->name('store');
+            Route::get('{correction}', 'show')->whereNumber('correction')->name('show');
+            Route::post('{correction}/approve', 'approve')->whereNumber('correction')->name('approve');
+            Route::post('{correction}/reject', 'reject')->whereNumber('correction')->name('reject');
+        });
+
         Route::get('employees', [Admin\EmployeeController::class, 'index'])->name('employees.index');
         Route::get('employees/create', [Admin\EmployeeController::class, 'create'])->name('employees.create');
         Route::post('employees', [Admin\EmployeeController::class, 'store'])->name('employees.store');
@@ -148,12 +193,16 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::get('interested-leads', Admin\InterestedLeadController::class)->name('leads.interested');
 
         // Department-wise data tracking
+        Route::get('roles', [Admin\RoleController::class, 'index'])->name('roles.index');
+        Route::post('roles', [Admin\RoleController::class, 'store'])->name('roles.store');
+        Route::delete('roles/{role}', [Admin\RoleController::class, 'destroy'])->whereNumber('role')->name('roles.destroy');
+
         Route::get('departments', [Admin\DepartmentDataController::class, 'index'])->name('departments.index');
+        Route::post('departments', [Admin\DepartmentDataController::class, 'store'])->name('departments.store');
         Route::get('departments/{department}', [Admin\DepartmentDataController::class, 'show'])->whereNumber('department')->name('departments.show');
 
         // Daily work report (admin: all employees, download, correct, punch out, mail)
         Route::get('reports/daily', [DailyWorkReportController::class, 'index'])->name('reports.daily');
-        Route::post('reports/{session}/correct', [DailyWorkReportController::class, 'correct'])->whereNumber('session')->name('reports.correct');
         Route::post('reports/{session}/punch-out', [DailyWorkReportController::class, 'punchOut'])->whereNumber('session')->name('reports.punch-out');
         Route::post('reports/{session}/send', [DailyWorkReportController::class, 'send'])->whereNumber('session')->name('reports.send');
 
@@ -163,7 +212,9 @@ Route::middleware(['auth', 'role:super_admin,hr'])
             Route::post('upload', 'upload')->name('upload');
             Route::get('template', 'template')->name('template');
             Route::post('share', 'share')->name('share');
+            Route::post('lead-task', 'leadTask')->name('lead-task');
             Route::post('recall/{user}', 'recall')->whereNumber('user')->name('recall');
+            Route::post('shares/{share}/rollback', 'rollback')->whereNumber('share')->name('rollback');
             Route::get('batches/{batch}', 'show')->whereNumber('batch')->name('show');
         });
 

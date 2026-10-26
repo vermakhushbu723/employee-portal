@@ -6,7 +6,6 @@ use App\Enums\Role;
 use App\Models\AttendanceSession;
 use App\Models\User;
 use App\Services\AttendanceService;
-use App\Services\AuditLogger;
 use App\Services\DailyReportService;
 use App\Services\WorkScoreService;
 use App\Support\Duration;
@@ -16,8 +15,8 @@ use Illuminate\Validation\Rule;
 
 /**
  * Daily work report.
- *   Manager: own team only, view only.
- *   Admin/HR: everyone, can download, correct a day, punch an employee out and (re)send the mail.
+ *   Manager: own team only (corrections go through Correction Requests for review).
+ *   Admin/HR: everyone, can download, punch an employee out and (re)send the mail.
  */
 class DailyWorkReportController extends Controller
 {
@@ -29,7 +28,10 @@ class DailyWorkReportController extends Controller
         $isAdmin = $user->role->portal() === 'admin';
         $date = $this->date($request);
 
-        $rows = $this->reports->rows($this->visibleUsers($user), $date);
+        $q = trim((string) $request->query('q'));
+        $users = $this->visibleUsers($user)->when($q !== '', fn ($c) => $c->filter(
+            fn ($u) => str_contains(strtolower($u->name.' '.$u->employee_code), strtolower($q)))->values());
+        $rows = $this->reports->rows($users, $date);
 
         if ($isAdmin && $request->boolean('export')) {
             return $this->export($rows, $date);
@@ -47,31 +49,6 @@ class DailyWorkReportController extends Controller
             ],
             'mailReady' => ! in_array(config('mail.default'), ['log', 'array'], true),
         ]);
-    }
-
-    /** Admin correction of a day's result. The report is mailed again afterwards. */
-    public function correct(Request $request, AttendanceSession $session, AuditLogger $audit)
-    {
-        $data = $request->validate([
-            'grade' => ['required', Rule::in(['full', 'half', 'quarter', 'none'])],
-            'note' => ['required', 'string', 'min:3', 'max:500'],
-        ]);
-
-        if ($session->grade === null && $session->work_date->isToday() && $session->isOpen()) {
-            return back()->withErrors(['action' => 'Punch the employee out first, then correct the day.']);
-        }
-
-        $session->update([
-            'grade' => $data['grade'],
-            'status' => WorkScoreService::statusForGrade($data['grade'], (bool) $session->is_late),
-            'corrected_by' => $request->user()->id,
-            'correction_note' => $data['note'],
-        ]);
-        $audit->log('attendance.correct', "Corrected {$session->user->employee_code} on {$session->work_date->format('d M')} to {$data['grade']}: {$data['note']}", ['session_id' => $session->id]);
-
-        $mail = $this->reports->send($session->fresh(['user.employee.manager', 'breaks']));
-
-        return back()->with('success', "Day corrected for {$session->user->name}.".$this->mailMessage($mail));
     }
 
     /** Admin punches out an employee who forgot / left (the day is scored from their active time). */

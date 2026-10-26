@@ -83,6 +83,17 @@
                 <div class="form-check m-0"><input class="form-check-input" type="radio" name="mode" id="upEach" value="each"><label class="form-check-label" for="upEach">Fixed count each</label></div>
                 <input type="number" name="count" min="0" max="5000" class="form-control form-control-sm" style="width:130px" placeholder="Count (optional)">
             </div>
+
+            {{-- Work details: shown to the employee with the file name --}}
+            <div class="work-box mt-3">
+                <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-chat-square-text-fill text-primary"></i><span class="fw-600 small">Work Details for employees</span></div>
+                <textarea name="work_message" rows="2" maxlength="1000" class="form-control mb-2" placeholder="e.g. Is file me diye gaye customers ko call karna hai aur kam se kam 20 interested customers nikalne hai.">{{ old('work_message') }}</textarea>
+                <div class="d-flex align-items-center gap-2 small">
+                    <label for="intTarget" class="fw-600 text-nowrap">Interested target per employee</label>
+                    <input type="number" id="intTarget" name="interested_target" min="0" max="5000" value="{{ old('interested_target', 0) }}" class="form-control form-control-sm" style="width:110px">
+                    <span class="text-muted">Added to today's target until done</span>
+                </div>
+            </div>
         </div>
 
         {{-- 3. Data fields --}}
@@ -98,7 +109,15 @@
             <div class="small text-muted mt-2"><span id="fieldCount">0</span> of <span id="fieldTotal">0</span> field(s) selected</div>
         </div>
 
-        <button type="submit" class="btn btn-success btn-lg w-100" id="uploadBtn"><i class="bi bi-upload me-1"></i>Upload & Share Data</button>
+        <div class="row g-2">
+            <div class="col-sm-7">
+                <button type="submit" name="action" value="share" class="btn btn-success btn-lg w-100" id="uploadBtn"><i class="bi bi-upload me-1"></i>Upload & Share Data</button>
+            </div>
+            <div class="col-sm-5">
+                <button type="submit" name="action" value="upload" class="btn btn-outline-primary btn-lg w-100" id="onlyUploadBtn"><i class="bi bi-cloud-arrow-up me-1"></i>Only Upload</button>
+            </div>
+        </div>
+        <div class="small-xs text-muted mt-1"><b>Only Upload</b> keeps the data unassigned — share it later from "Share Unassigned Data".</div>
     </div>
 
     <div class="col-xl-6">
@@ -154,14 +173,14 @@
 </div>
 
 {{-- ============ Share data that is still unassigned ============ --}}
-<form method="POST" action="{{ route('admin.data.share') }}" class="card-soft card-pad mb-3">
+<form method="POST" action="{{ route('admin.data.share') }}" class="card-soft card-pad mb-3" id="shareForm">
     @csrf
     <div class="section-head">
         <h3 class="section-title"><i class="bi bi-share me-1"></i>Share Unassigned Data</h3>
         <span class="small text-muted">{{ number_format($stats['pool']) }} unassigned</span>
     </div>
-    <div class="row g-2 align-items-end">
-        <div class="col-md-4">
+    <div class="row g-2">
+        <div class="col-md-5">
             <label class="form-label">Which data</label>
             <select name="batch_id" class="form-select">
                 <option value="">All unassigned data</option>
@@ -170,28 +189,112 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-4">
             <label class="form-label">How</label>
             <select name="mode" class="form-select"><option value="equal">Split equally</option><option value="each">Fixed count each</option></select>
         </div>
-        <div class="col-md-2">
+        <div class="col-6 col-md-3">
             <label class="form-label">Count</label>
             <input type="number" name="count" min="0" max="5000" class="form-control" placeholder="blank = all">
         </div>
+
+        {{-- 1. Message box --}}
+        <div class="col-md-9">
+            <label class="form-label"><i class="bi bi-chat-square-text me-1 text-primary"></i>Message — what work to do on this data</label>
+            <textarea name="work_message" rows="2" maxlength="1000" class="form-control" placeholder="e.g. Is data par sabhi customers ko call karke home loan ke interested customers nikalne hai."></textarea>
+        </div>
+        {{-- 2. Interested lead count --}}
         <div class="col-md-3">
-            <button class="btn btn-success w-100" @disabled($stats['pool'] === 0)><i class="bi bi-send me-1"></i>Share</button>
+            <label class="form-label"><i class="bi bi-people me-1 text-primary"></i>Interested lead count</label>
+            <input type="number" name="interested_target" min="0" max="5000" value="0" class="form-control">
+            <div class="small-xs text-muted">Per employee · added to today's target</div>
+        </div>
+
+        {{-- 3. Manager selection --}}
+        <div class="col-md-5">
+            <label class="form-label"><i class="bi bi-person-badge me-1 text-primary"></i>Manager</label>
+            <select name="manager_id" class="form-select" data-share-manager>
+                <option value="">All managers / all employees</option>
+                @foreach ($managers as $mgr)
+                    <option value="{{ $mgr->id }}">{{ $mgr->name }} ({{ $mgr->employee_code }})</option>
+                @endforeach
+            </select>
+        </div>
+        {{-- 4. Employee search --}}
+        <div class="col-md-7">
+            <label class="form-label"><i class="bi bi-search me-1 text-primary"></i>Employee search</label>
+            <div class="d-flex gap-2">
+                <div class="input-icon flex-grow-1">
+                    <i class="bi bi-search"></i>
+                    <input type="search" class="form-control" placeholder="Name or employee ID" data-share-search>
+                </div>
+                <span class="badge-soft tone-primary align-self-center px-3 py-2 text-nowrap"><span data-share-count>0</span> selected</span>
+            </div>
         </div>
     </div>
-    <div class="row g-1 mt-2" style="max-height: 140px; overflow-y: auto">
-        @foreach ($recipients as $emp)
-            <div class="col-md-4 col-lg-3">
-                <label class="d-flex align-items-center gap-2 small" style="cursor:pointer">
-                    <input class="form-check-input m-0" type="checkbox" name="users[]" value="{{ $emp->id }}"> {{ $emp->name }} <span class="text-muted">{{ $emp->employee_code }}</span>
-                </label>
-            </div>
+
+    <div class="share-emp-list mt-2" data-share-list>
+        <label class="share-emp share-emp-all"><input class="form-check-input m-0" type="checkbox" data-share-all> <b class="small">Select all shown</b></label>
+        @foreach ($staff->filter->isActive() as $emp)
+            <label class="share-emp" data-manager="{{ $emp->employee?->manager_id }}" data-search="{{ strtolower($emp->name.' '.$emp->employee_code) }}">
+                <input class="form-check-input m-0" type="checkbox" name="users[]" value="{{ $emp->id }}">
+                <span class="small fw-600">{{ $emp->name }}</span>
+                <span class="small-xs text-muted">{{ $emp->employee_code }} · {{ $emp->employee?->department?->name ?? '—' }}</span>
+            </label>
         @endforeach
+        <div class="small text-muted d-none p-2" data-share-empty>No employee matches.</div>
     </div>
+
+    <button class="btn btn-success w-100 mt-3" @disabled($stats['pool'] === 0)><i class="bi bi-send me-1"></i>Share Data</button>
 </form>
+
+{{-- ============ Recent data shares (with rollback) ============ --}}
+<div class="card-soft mb-3" data-live-region="data">
+    <div class="card-pad pb-2">
+        <h3 class="section-title"><i class="bi bi-clock-history me-1"></i>Recent Data Shares</h3>
+        <div class="small text-muted">Shared to the wrong person? <b>Rollback</b> returns the leads not called yet to the unassigned pool.</div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-soft align-middle mb-0">
+            <thead><tr><th>When</th><th>Data</th><th>Shared To</th><th class="text-end">Leads</th><th class="text-end">Called</th><th>Message</th><th>By</th><th></th></tr></thead>
+            <tbody>
+                @php $shareUsers = \App\Models\User::whereIn('id', $shares->flatMap(fn ($sh) => array_keys($sh->recipients ?? []))->unique())->pluck('name', 'id'); @endphp
+                @forelse ($shares as $sh)
+                    <tr @class(['opacity-75' => $sh->rolled_back_at])>
+                        <td class="small text-nowrap">{{ $sh->created_at->format('d M, h:i A') }}</td>
+                        <td class="small">{{ $sh->batch?->name ?? 'All unassigned' }}@if ($sh->manager)<div class="small-xs text-muted">Manager: {{ $sh->manager->name }}</div>@endif</td>
+                        <td class="small" style="max-width:240px">
+                            @foreach ($sh->recipients ?? [] as $uid => $n)
+                                <span class="text-nowrap">{{ $shareUsers[$uid] ?? 'User '.$uid }} <b>{{ $n }}</b></span>@if (! $loop->last), @endif
+                            @endforeach
+                        </td>
+                        <td class="text-end fw-600">{{ $sh->total }}</td>
+                        <td class="text-end">{{ $sh->called_count }}</td>
+                        <td class="small text-muted" style="max-width:200px">{{ \Illuminate\Support\Str::limit($sh->message, 60) ?: '—' }}@if ($sh->interested_target)<div class="small-xs">Target {{ $sh->interested_target }} interested</div>@endif</td>
+                        <td class="small text-nowrap">{{ $sh->sharer?->name }}</td>
+                        <td class="text-end text-nowrap">
+                            @if ($sh->rolled_back_at)
+                                <x-badge tone="secondary"><i class="bi bi-arrow-counterclockwise"></i> Rolled back</x-badge>
+                                <div class="small-xs text-muted">{{ $sh->rolled_back_count }} returned · {{ $sh->rolledBackBy?->name }}</div>
+                            @elseif ($sh->total > $sh->called_count)
+                                <form method="POST" action="{{ route('admin.data.rollback', $sh) }}" data-confirm="Rollback this share? {{ $sh->total - $sh->called_count }} un-called lead(s) go back to the unassigned pool. Called leads stay with the employees.">
+                                    @csrf
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Rollback</button>
+                                </form>
+                            @else
+                                <span class="small-xs text-muted">All called</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8"><x-empty-state icon="clock-history" title="No shares yet" /></td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@include('partials.lead-task-form', ['taskAction' => route('admin.data.lead-task'), 'taskUsers' => $recipients])
 
 <div data-live-region="data">
     {{-- Live progress per employee --}}

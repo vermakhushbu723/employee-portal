@@ -8,6 +8,7 @@
     $q = array_filter(['from' => $from->toDateString(), 'to' => $to->toDateString(), 'manager' => $filters['manager'], 'employee' => $filters['employee']]);
     $tabUrl = fn ($t, $extra = []) => route('admin.departments.show', ['department' => $department, 'tab' => $t] + $q + $extra);
     $tabList = [
+        ['team', 'Team Work', 'people-fill'],
         ['overview', 'Overview', 'grid-1x2'],
         ['uploaded', 'Uploaded Data', 'cloud-arrow-up'],
         ['shared', 'Shared Data', 'share'],
@@ -59,9 +60,13 @@
     @endforeach
 </nav>
 
-@include('admin.departments.partials.kpis')
+@if ($tab !== 'team')
+    @include('admin.departments.partials.kpis')
+@endif
 
-@if ($tab === 'overview')
+@if ($tab === 'team')
+    @include('admin.departments.partials.team-performance')
+@elseif ($tab === 'overview')
     <div class="row g-3 mb-3">
         <div class="col-lg-4">
             <div class="card-soft card-pad h-100">

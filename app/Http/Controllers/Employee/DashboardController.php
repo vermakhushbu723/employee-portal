@@ -36,6 +36,10 @@ class DashboardController extends Controller
             'checkIn' => $attendance->checkInState($user, $session),
             'score' => $session ? app(\App\Services\WorkScoreService::class)->forSession($user, $session) : null,
             'newData' => \App\Models\Lead::where('assigned_to', $user->id)->whereNotNull('assigned_at')->where('status', 'new')->count(),
+            'workCards' => app(\App\Services\WorkAssignmentService::class)->cardsFor($user),
+            'training' => app(\App\Services\TrainingService::class)->status($user),
+            'shift' => $user->currentShift(),
+            'targets' => app(\App\Services\WorkScoreService::class)->targets($user),
         ]);
     }
 }

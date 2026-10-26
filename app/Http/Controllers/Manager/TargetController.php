@@ -14,7 +14,7 @@ class TargetController extends Controller
     public function index(Request $request, WorkScoreService $score)
     {
         $team = $request->user()->teamMembers()->orderBy('name')->get()
-            ->map(fn ($u) => ['user' => $u, 'targets' => $score->targets($u)]);
+            ->map(fn ($u) => ['user' => $u, 'targets' => $score->baseTargets($u)]);
 
         return view('manager.targets', ['team' => $team, 'defaults' => config('portal.work_score.default_targets')]);
     }

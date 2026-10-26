@@ -10,10 +10,24 @@
     <div class="col-lg-6">
 
         <div class="card-soft card-pad text-center mb-3" style="background: var(--brand-soft)">
-            <div class="text-muted small fw-600">Shift Ends In</div>
-            <div class="countdown my-1"><i class="bi bi-clock me-2 fs-3"></i><span data-bind="shift_ends_in:hms">{{ Duration::hms($timer['shift_ends_in']) }}</span></div>
-            <div class="text-muted small">(Till {{ $timer['shift_end_at'] }})</div>
+            @if ($timer['shift_over'])
+                <div class="text-muted small fw-600">Shift Time</div>
+                <div class="countdown my-1 text-danger"><i class="bi bi-clock-history me-2 fs-3"></i>Shift Over</div>
+                <div class="text-muted small">Shift ended at {{ $timer['shift_end_at'] }} — complete your work to punch out</div>
+            @else
+                <div class="text-muted small fw-600">Shift Ends In</div>
+                <div class="countdown my-1"><i class="bi bi-clock me-2 fs-3"></i><span data-bind="shift_ends_in:hms">{{ Duration::hms($timer['shift_ends_in']) }}</span></div>
+                <div class="text-muted small">(Till {{ $timer['shift_end_at'] }})</div>
+            @endif
         </div>
+
+        @if ($timer['checked_in'])
+            <div class="row g-2 mb-3 text-center">
+                <div class="col-4"><div class="stat-tile tone-success flex-column justify-content-center"><div class="stat-label">Active (Working)</div><div class="stat-value" data-bind="worked:hms">{{ Duration::hms($timer['worked']) }}</div></div></div>
+                <div class="col-4"><div class="stat-tile tone-danger flex-column justify-content-center"><div class="stat-label">Inactive</div><div class="stat-value" data-bind="idle:hms">{{ Duration::hms($timer['idle']) }}</div></div></div>
+                <div class="col-4"><div class="stat-tile tone-primary flex-column justify-content-center"><div class="stat-label">Total since punch-in</div><div class="stat-value" data-bind="total:hms">{{ Duration::hms($timer['total']) }}</div></div></div>
+            </div>
+        @endif
 
         @unless ($timer['checked_in'])
             <div class="info-box mb-3">
@@ -30,7 +44,7 @@
                 </svg>
                 <div class="center">
                     <div class="text-muted small fw-600">
-                        {{ $timer['on_break'] ? 'On Break — Paused' : ($timer['checked_out'] ? 'Checked Out' : 'Worked Time') }}
+                        {{ $timer['on_break'] ? 'On Break — Paused' : ($timer['checked_out'] ? 'Checked Out' : 'Active Work Time') }}
                     </div>
                     <div class="countdown" data-bind="worked:hms">{{ Duration::hms($timer['worked']) }}</div>
                     <div class="text-muted small">of {{ Duration::hms($timer['required']) }}<br>(Required)</div>
