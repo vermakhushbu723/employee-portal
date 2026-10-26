@@ -35,6 +35,25 @@ return [
         'cc_admins' => (bool) env('REPORT_MAIL_CC_ADMINS', true),
     ],
 
+    // Built-in meeting room. Video goes directly between browsers (free STUN). Some strict office /
+    // mobile networks also need a TURN relay — add one here if a call keeps showing "Connection failed".
+    'meeting' => [
+        'turn_url' => env('MEET_TURN_URL'),      // e.g. turn:relay.example.com:3478,turns:relay.example.com:443
+        'turn_user' => env('MEET_TURN_USER'),
+        'turn_pass' => env('MEET_TURN_PASS'),
+    ],
+
+    // WhatsApp inside the portal: each user scans the QR in the side panel with their own phone.
+    // The gateway (whatsapp-gateway/server.mjs) runs on the server and is started automatically when needed.
+    'whatsapp' => [
+        'enabled' => (bool) env('WA_ENABLED', true),
+        'socket' => env('WA_GATEWAY_SOCKET'),            // server: /home/<user>/wa-gateway/gateway.sock
+        'url' => env('WA_GATEWAY_URL', 'http://127.0.0.1:3911'), // development (no socket)
+        'dir' => env('WA_GATEWAY_DIR'),                  // server: /home/<user>/wa-gateway
+        'node' => env('WA_NODE_BIN', '/opt/alt/alt-nodejs24/root/usr/bin/node'),
+        'key' => env('WA_GATEWAY_KEY', ''),
+    ],
+
     'lead' => [
         'cities' => ['Delhi', 'Gurugram', 'Noida', 'Mumbai', 'Bengaluru', 'Lucknow', 'Pune', 'Jaipur', 'Hyderabad', 'Kolkata'],
         'sources' => ['Cold Call', 'Website', 'Facebook', 'Instagram', 'Referral', 'Walk-in', 'WhatsApp', 'Other'],
@@ -105,6 +124,7 @@ return [
             ['route' => 'manager.corrections.index', 'active' => 'manager.corrections.*', 'icon' => 'pencil-square', 'label' => 'Correction Requests'],
             ['route' => 'manager.targets', 'icon' => 'bullseye', 'label' => 'Daily Targets'],
             ['route' => 'manager.assign-work.create', 'icon' => 'clipboard-plus', 'label' => 'Assign Work'],
+            ['route' => 'manager.logout-requests.index', 'icon' => 'box-arrow-right', 'label' => 'Logout Requests'],
             ['route' => 'manager.approvals.index', 'icon' => 'check2-square', 'label' => 'Approvals'],
             ['heading' => 'Account'],
             ['route' => 'notifications.index', 'icon' => 'megaphone', 'label' => 'Announcements'],
@@ -124,6 +144,7 @@ return [
             ['route' => 'admin.reports.daily', 'icon' => 'clipboard-data', 'label' => 'Daily Work Report'],
             ['route' => 'admin.corrections.index', 'active' => 'admin.corrections.*', 'icon' => 'pencil-square', 'label' => 'Correction Requests'],
             ['route' => 'admin.meetings.index', 'icon' => 'camera-video', 'label' => 'Meetings'],
+            ['route' => 'admin.logout-requests.index', 'icon' => 'box-arrow-right', 'label' => 'Logout Requests'],
             ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late Check-in Requests'],
             ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leave Approvals'],
             ['heading' => 'Account'],

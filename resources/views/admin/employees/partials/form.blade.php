@@ -109,7 +109,7 @@
                 </select>
             </div>
             <div class="col-12 {{ $currentShift === 'custom' ? '' : 'd-none' }}" id="customShift">
-                <div class="row g-2 p-2 rounded-3" style="background: var(--brand-soft)">
+                <div class="row g-2 p-2 rounded-3" style="background: var(--brand-soft)" data-shift-calc>
                     <div class="col-6 col-md-3">
                         <label class="form-label">Start time</label>
                         <input type="time" name="custom_start" value="{{ old('custom_start', '10:00') }}" class="form-control form-control-sm @error('custom_start') is-invalid @enderror">
@@ -119,8 +119,8 @@
                         <input type="time" name="custom_end" value="{{ old('custom_end', '19:00') }}" class="form-control form-control-sm @error('custom_end') is-invalid @enderror">
                     </div>
                     <div class="col-6 col-md-3">
-                        <label class="form-label">Working hours</label>
-                        <input type="number" name="custom_hours" step="0.5" min="1" max="16" value="{{ old('custom_hours', 8) }}" class="form-control form-control-sm @error('custom_hours') is-invalid @enderror">
+                        <label class="form-label">Working hours <span class="text-muted fw-normal">(auto)</span></label>
+                        <input type="text" name="custom_hours" value="{{ old('custom_hours', 8) }}" class="form-control form-control-sm bg-white fw-bold @error('custom_hours') is-invalid @enderror" readonly tabindex="-1" data-shift-hours>
                     </div>
                     <div class="col-6 col-md-3">
                         <label class="form-label">Break (minutes)</label>
@@ -129,7 +129,7 @@
                     @foreach (['custom_start', 'custom_end', 'custom_hours'] as $f)
                         @error($f)<div class="col-12 small text-danger">{{ $message }}</div>@enderror
                     @endforeach
-                    <div class="col-12 small text-muted">On-time punch-in: 5 min before start up to 15 min after start.</div>
+                    <div class="col-12 small text-muted"><span data-shift-note>Working hours = shift time − break.</span> On-time punch-in: 5 min before start up to 15 min after start.</div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -174,9 +174,13 @@
     <div class="card-soft card-pad">
         <div class="section-head">
             <h3 class="section-title">Training & Joining</h3>
-            <span class="small text-muted">Training period comes before the joining date</span>
+            @php $noTraining = old('no_training', $user && ! $emp?->training_from ? '1' : null); @endphp
+            <label class="no-training-switch">
+                <input type="checkbox" name="no_training" value="1" class="form-check-input m-0" @checked($noTraining) data-no-training>
+                <span>No training</span>
+            </label>
         </div>
-        <div class="row g-3 align-items-end">
+        <div class="row g-3 align-items-end" data-training-box>
             <div class="col-md-4">
                 <label class="form-label" for="training_from">Training Date — From</label>
                 <div class="input-icon">
@@ -194,13 +198,14 @@
                 @error('training_to')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-4">
-                <label class="form-label" for="joining_date">Joining Date</label>
+                <label class="form-label" for="joining_date">Joining Date <span class="small text-muted fw-normal" data-join-hint></span></label>
                 <div class="input-icon">
                     <i class="bi bi-calendar-check"></i>
                     <input type="date" id="joining_date" name="joining_date" value="{{ old('joining_date', $date($emp?->joining_date) ?? ($user ? '' : today()->toDateString())) }}" class="form-control @error('joining_date') is-invalid @enderror">
                 </div>
                 @error('joining_date')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
             </div>
+            <div class="col-12 small text-muted" data-training-note>With training: joining is set to the next working day after training ends (it moves forward if training days are missed). No training: work starts from the joining date.</div>
         </div>
     </div>
 </div>

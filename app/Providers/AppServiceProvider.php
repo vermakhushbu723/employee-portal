@@ -53,6 +53,9 @@ class AppServiceProvider extends ServiceProvider
             $view->with([
                 'alertCount' => $user ? Announcement::visibleTo($user)->where('published_at', '>=', now()->subDays(7))->count() : 0,
                 'activeTimer' => $activeTimer,
+                // Admin / manager: logout requests waiting for verification (blinking button)
+                'logoutPending' => $user && in_array($user->role->portal(), ['admin', 'manager'], true)
+                    ? app(\App\Services\LogoutReviewService::class)->pendingCount($user) : 0,
             ]);
         });
 
@@ -84,7 +87,17 @@ class AppServiceProvider extends ServiceProvider
                 }
             }
 
-            $view->with('punchGate', $gate);
+            // Employee: today's logout request (under review banner / decision popup)
+            $logoutSession = null;
+            if ($user && $user->role->portal() === 'employee') {
+                $s = app(AttendanceService::class)->todaySession($user);
+                if ($s && $s->checkout_type === 'exception' && $s->review_status
+                    && ($s->logoutPending() || ! $s->decision_seen_at)) {
+                    $logoutSession = $s->loadMissing('reviewer');
+                }
+            }
+
+            $view->with(['punchGate' => $gate, 'logoutSession' => $logoutSession]);
         });
     }
 }

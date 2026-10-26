@@ -33,6 +33,8 @@ class LiveController extends Controller
 
             // Punch-in popup: changes when the window opens/closes or admin decides a late request
             $attendance = app(AttendanceService::class);
+            $today = $attendance->todaySession($user);
+            $versions['logoutme'] = md5(($today?->review_status ?? '').'|'.($today?->decision_seen_at ?? ''));
             $versions['punch'] = $attendance->mustPunchIn($user)
                 ? md5(json_encode([$attendance->checkInState($user)['state'], $attendance->lateRequestToday($user)?->status?->value]))
                 : 'in';
@@ -45,6 +47,12 @@ class LiveController extends Controller
                 .(clone $uploaded)->whereNotNull('assigned_to')->count().'|'.(clone $uploaded)->where('status', '!=', 'new')->count());
             $versions['allleads'] = md5(Lead::count().'|'.Lead::max('updated_at').'|'.Lead::where('status', 'interested')->count());
             $versions['late'] = md5(LateCheckinRequest::where('status', LeaveStatus::Pending)->count().'|'.LateCheckinRequest::max('updated_at'));
+        }
+
+        // Logout requests: blinking top-bar button + the requests page
+        if (in_array($user->role->portal(), ['admin', 'manager'], true)) {
+            $n = app(\App\Services\LogoutReviewService::class)->visible($user);
+            $versions['logoutreq'] = md5((clone $n)->whereIn('review_status', ['pending', 'verified'])->count().'|'.(clone $n)->max('updated_at'));
         }
 
         // Live status dashboards (admin / manager): refresh about every 30 s, or at once when a meeting or correction changes

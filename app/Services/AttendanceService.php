@@ -360,6 +360,7 @@ class AttendanceService
                 'checkout_type' => $exception ? 'exception' : 'normal',
                 'checkout_reason' => $reason,
                 'review_status' => $exception ? 'pending' : null,
+                'logout_requested_at' => $exception ? $now : null,
             ])->save();
 
             // Attendance for the day comes from the work score (full / half / quarter / absent)

@@ -9,7 +9,17 @@
     ];
 @endphp
 <div class="card-soft card-pad mb-3">
-    <h3 class="section-title mb-3">{{ $title ?? "Today's Overall Performance" }}</h3>
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <h3 class="section-title mb-0 flex-grow-1">{{ $title ?? "Today's Overall Performance" }}</h3>
+        @isset($teams)
+            <form method="GET">
+                <select name="team" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Team">
+                    <option value="">All Teams</option>
+                    @foreach ($teams as $t)<option value="{{ $t->id }}" @selected($team === $t->id)>{{ $t->name }}</option>@endforeach
+                </select>
+            </form>
+        @endisset
+    </div>
     <div class="row g-2 g-md-3">
         @foreach ($cards as [$icon, $label, $value, $target, $tone])
             <div class="col-6 col-lg-3">

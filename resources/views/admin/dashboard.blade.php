@@ -22,7 +22,7 @@
 
 <div data-live-region="status">
     @include('partials.live.kpis', ['summary' => $summary])
-    @include('partials.live.performance', ['summary' => $summary])
+    @include('partials.live.performance', ['summary' => $summary, 'teams' => $teams, 'team' => $team])
 
     <div class="row g-3 mb-3">
         <div class="col-lg-4">
@@ -92,6 +92,9 @@
                         <div class="small-xs text-muted">{{ $m->scheduled_at->format('h:i A') }} · {{ $m->user->name }}</div>
                     </div>
                     <x-badge :tone="$mTone">{{ $mLabel }}</x-badge>
+                    @if ($m->isPortal() && in_array($m->status, ['upcoming', 'live'], true))
+                        <a href="{{ route('admin.meetings.room', $m) }}" class="btn btn-sm btn-primary">Join</a>
+                    @endif
                 </div>
             @empty
                 <x-empty-state icon="calendar-event" title="No meetings today" />

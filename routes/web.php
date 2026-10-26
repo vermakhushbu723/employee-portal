@@ -7,10 +7,13 @@ use App\Http\Controllers\DailyWorkReportController;
 use App\Http\Controllers\Employee;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LiveController;
+use App\Http\Controllers\LogoutRequestController;
 use App\Http\Controllers\Manager;
 use App\Http\Controllers\MeetingAdminController;
+use App\Http\Controllers\MeetingRoomController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WorkCorrectionController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +34,15 @@ Route::middleware('guest')->group(function () {
 // Public "Install the app" page — share this link with employees.
 Route::view('install', 'install')->name('install');
 
+// Built-in meeting room — customer joins with the secret link (no login)
+Route::controller(MeetingRoomController::class)->prefix('meet/{token}')->where(['token' => '[A-Za-z0-9]{32}'])->name('meet.guest')->group(function () {
+    Route::get('/', 'guest')->name('');
+    Route::post('join', 'join')->middleware('throttle:20,1')->name('.join');
+    Route::post('signal', 'signal')->middleware('throttle:600,1')->name('.signal');
+    Route::get('poll', 'poll')->middleware('throttle:200,1')->name('.poll');
+    Route::post('leave', 'leave')->name('.leave');
+});
+
 Route::middleware('auth')->group(function () {
     Route::get('/', HomeController::class)->name('home');
     Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
@@ -40,6 +52,24 @@ Route::middleware('auth')->group(function () {
     Route::get('notifications', [AnnouncementController::class, 'index'])->name('notifications.index');
     Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
+    // WhatsApp inside the portal (each user's own linked WhatsApp)
+    Route::controller(WhatsAppController::class)->prefix('wa')->name('wa.')->group(function () {
+        Route::post('start', 'start')->name('start');
+        Route::get('status', 'status')->name('status');
+        Route::get('chats', 'chats')->name('chats');
+        Route::get('messages', 'messages')->name('messages');
+        Route::post('send', 'send')->middleware('throttle:60,1')->name('send');
+        Route::post('logout', 'logout')->name('logout');
+    });
+
+    // Built-in meeting room API for staff (employee, admin, manager) — joins inside the dashboard
+    Route::controller(MeetingRoomController::class)->prefix('room/{meeting}')->whereNumber('meeting')->name('meet.')->group(function () {
+        Route::post('join', 'join')->name('join');
+        Route::post('signal', 'signal')->name('signal');
+        Route::get('poll', 'poll')->name('poll');
+        Route::post('leave', 'leave')->name('leave');
+    });
 });
 
 /*
@@ -64,6 +94,7 @@ Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
             Route::post('late-request', 'lateRequest')->name('late-request');
             Route::post('check-out', 'checkOut')->name('check-out');
             Route::post('exception-checkout', 'exceptionCheckout')->name('exception-checkout');
+            Route::post('logout-decision/seen', 'decisionSeen')->name('decision-seen');
         });
 
         // Live work timer (+ JSON for the ticking UI)
@@ -132,6 +163,10 @@ Route::middleware(['auth', 'role:manager,team_leader'])
         Route::get('meetings', [MeetingAdminController::class, 'index'])->name('meetings.index');
         Route::post('meetings', [MeetingAdminController::class, 'store'])->name('meetings.store');
         Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
+        Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
+        Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
+        Route::post('logout-requests/{session}/approve', [LogoutRequestController::class, 'approve'])->whereNumber('session')->name('logout-requests.approve');
+        Route::post('logout-requests/{session}/reject', [LogoutRequestController::class, 'reject'])->whereNumber('session')->name('logout-requests.reject');
         Route::controller(WorkCorrectionController::class)->prefix('corrections')->name('corrections.')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::get('new/{session}', 'create')->whereNumber('session')->name('create');
@@ -154,7 +189,6 @@ Route::middleware(['auth', 'role:manager,team_leader'])
             Route::get('/', 'index')->name('index');
             Route::post('leaves/{leave}/approve', 'approveLeave')->whereNumber('leave')->name('leaves.approve');
             Route::post('leaves/{leave}/reject', 'rejectLeave')->whereNumber('leave')->name('leaves.reject');
-            Route::post('checkouts/{session}/review', 'reviewCheckout')->whereNumber('session')->name('checkouts.review');
         });
     });
 
@@ -174,6 +208,10 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::get('meetings', [MeetingAdminController::class, 'index'])->name('meetings.index');
         Route::post('meetings', [MeetingAdminController::class, 'store'])->name('meetings.store');
         Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
+        Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
+        Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
+        Route::post('logout-requests/{session}/approve', [LogoutRequestController::class, 'approve'])->whereNumber('session')->name('logout-requests.approve');
+        Route::post('logout-requests/{session}/reject', [LogoutRequestController::class, 'reject'])->whereNumber('session')->name('logout-requests.reject');
         Route::controller(WorkCorrectionController::class)->prefix('corrections')->name('corrections.')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::get('new/{session}', 'create')->whereNumber('session')->name('create');

@@ -26,9 +26,9 @@
     @forelse ($meetings as $m)
         @php
             [$label, $tone] = $m->badge();
-            $wa = $m->customer_mobile && $m->link
+            $wa = $m->customer_mobile && $m->joinLink()
                 ? 'https://wa.me/'.preg_replace('/\D/', '', strlen(preg_replace('/\D/', '', $m->customer_mobile)) === 10 ? '91'.$m->customer_mobile : $m->customer_mobile)
-                    .'?text='.rawurlencode("Hello {$m->customer_name}, your meeting \"{$m->title}\" is on {$m->scheduled_at->format('d M Y, h:i A')}. Join here: {$m->link}")
+                    .'?text='.rawurlencode("Hello {$m->customer_name}, your meeting \"{$m->title}\" is on {$m->scheduled_at->format('d M Y, h:i A')}. Join here: {$m->joinLink()}")
                 : null;
             $fill = ['title_text' => $m->title.' — '.$m->customer_name, 'link' => $m->link, 'date' => $m->scheduled_at->toDateString(), 'time' => $m->scheduled_at->format('H:i')];
         @endphp
@@ -53,7 +53,7 @@
                     @if ($wa)<a href="{{ $wa }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" title="Send link to customer on WhatsApp"><i class="bi bi-whatsapp"></i></a>@endif
                     <button type="button" class="btn btn-sm btn-light" data-modal="#editModal" data-action="{{ route('employee.meetings.update', $m) }}"
                             data-fill='@json($fill)'>
-                        {{ $m->link ? 'Reschedule' : 'Add link' }}
+                        {{ $m->link || $m->isPortal() ? 'Reschedule' : 'Add link' }}
                     </button>
                 @endif
             </div>
@@ -90,7 +90,7 @@
                     <div class="platform-pick">
                         @foreach ($platforms as $key => [$plabel, $picon, $newUrl])
                             <label class="platform-opt">
-                                <input type="radio" name="platform" value="{{ $key }}" @checked(old('platform', 'google_meet') === $key) data-new-url="{{ $newUrl }}">
+                                <input type="radio" name="platform" value="{{ $key }}" @checked(old('platform', 'portal') === $key) data-new-url="{{ $newUrl }}">
                                 <span><i class="bi bi-{{ $picon }}"></i> {{ $plabel }}</span>
                             </label>
                         @endforeach
@@ -98,13 +98,14 @@
                 </div>
                 <div class="col-md-4"><label class="form-label required">Date</label><input type="date" name="date" class="form-control" min="{{ today()->toDateString() }}" value="{{ old('date', today()->toDateString()) }}" required></div>
                 <div class="col-md-3"><label class="form-label required">Time</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required></div>
-                <div class="col-md-5">
+                <div class="col-md-5" data-link-field>
                     <label class="form-label">Meeting link</label>
                     <div class="input-group">
                         <input type="url" name="link" class="form-control" value="{{ old('link') }}" placeholder="https://meet.google.com/…">
                         <button type="button" class="btn btn-outline-primary" data-create-link title="Opens the platform to create a new meeting — copy its link here"><i class="bi bi-plus-circle"></i> Create</button>
                     </div>
                 </div>
+                <div class="col-md-5 d-none" data-portal-note><div class="info-box h-100"><i class="bi bi-camera-video-fill"></i><div>Joins <b>inside the dashboard</b>. The customer gets a join link (send it on WhatsApp from the list) — no app or login needed.</div></div></div>
                 <div class="col-12"><label class="form-label">Notes (optional)</label><textarea name="notes" rows="2" class="form-control" maxlength="1000">{{ old('notes') }}</textarea></div>
             </div>
             <div class="modal-footer border-0">
@@ -146,6 +147,14 @@
     const sync = () => document.querySelectorAll('[data-manual-customer]').forEach((el) => el.classList.toggle('d-none', !!lead.value));
     lead?.addEventListener('change', sync);
     sync();
+    // Portal Meeting needs no link; outside platforms do
+    const platformSync = () => {
+        const portal = document.querySelector('input[name=platform]:checked')?.value === 'portal';
+        document.querySelector('[data-link-field]').classList.toggle('d-none', portal);
+        document.querySelector('[data-portal-note]').classList.toggle('d-none', !portal);
+    };
+    document.querySelectorAll('input[name=platform]').forEach((r) => r.addEventListener('change', platformSync));
+    platformSync();
     document.querySelector('[data-create-link]')?.addEventListener('click', () => {
         const url = document.querySelector('input[name=platform]:checked')?.dataset.newUrl;
         if (url) window.open(url, 'newMeeting', 'width=1000,height=720');

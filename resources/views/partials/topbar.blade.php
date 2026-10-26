@@ -23,6 +23,15 @@
                 <span data-active-state></span><span data-active-display></span>
             </div>
         @endif
+        @if (in_array(auth()->user()->role->portal(), ['admin', 'manager'], true))
+            {{-- Blinks while employee logout requests wait for verification --}}
+            <span data-live-region="logoutreq">
+                <a href="{{ route(auth()->user()->role->portal().'.logout-requests.index') }}"
+                   class="logout-alert {{ $logoutPending ? 'blink' : 'd-none' }}" title="Logout requests waiting for verification">
+                    <i class="bi bi-box-arrow-right"></i><span class="d-none d-md-inline">Logout Requests</span><b>{{ $logoutPending }}</b>
+                </a>
+            </span>
+        @endif
         <a href="{{ route('notifications.index') }}" class="btn-icon position-relative" aria-label="Announcements" id="bellLink">
             <i class="bi bi-bell"></i>
             <span class="topbar-badge {{ $alertCount > 0 ? '' : 'd-none' }}" id="bellBadge">{{ $alertCount > 9 ? '9+' : $alertCount }}</span>

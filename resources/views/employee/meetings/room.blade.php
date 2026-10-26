@@ -4,6 +4,14 @@
 @section('back', route('employee.meetings.index'))
 
 @section('content')
+@if ($m->isPortal())
+    {{-- Built-in room: the call happens right here in the dashboard --}}
+    @include('partials.meeting-room', [
+        'api' => \App\Http\Controllers\MeetingRoomController::api($m, false),
+        'endForm' => in_array($m->status, ['live', 'upcoming'], true) ? route('employee.meetings.end', $m) : null,
+        'backUrl' => route('employee.meetings.index'),
+    ])
+@else
 @php $live = $m->status === 'live'; @endphp
 <div class="row g-3">
     <div class="col-lg-8">
@@ -58,9 +66,13 @@
         </div>
     </div>
 </div>
+@endif
 @endsection
 
 @push('scripts')
+@if ($m->isPortal())
+<script src="{{ asset('js/meeting-room.js') }}?v={{ filemtime(public_path('js/meeting-room.js')) }}"></script>
+@else
 <script>
 (() => {
     let win = null;
@@ -80,4 +92,5 @@
     }
 })();
 </script>
+@endif
 @endpush

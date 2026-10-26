@@ -575,27 +575,6 @@ body:has(.punch-gate) { overflow: hidden; }
 .track-list .list-row.active { background: var(--brand-soft); }
 @media (max-width: 991.98px) { .track-map { height: 360px; } .track-list { max-height: none; } }
 
-/* ---------- WhatsApp mini panel ---------- */
-.wa-panel { position: fixed; right: 1rem; bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom) + 4.6rem); z-index: 1036; width: 320px; min-width: 260px; max-width: calc(100vw - 1rem); min-height: 44px; max-height: calc(100vh - 2rem); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 14px 40px rgba(30, 20, 10, .22); overflow: hidden; resize: both; }
-.wa-panel.dragging { opacity: .92; user-select: none; }
-.wa-panel.minimized { height: auto !important; resize: none; }
-.wa-panel.minimized .wa-body { display: none; }
-.wa-head { display: flex; align-items: center; gap: .45rem; padding: .55rem .6rem .55rem .8rem; background: #128C7E; color: #fff; cursor: move; touch-action: none; flex-shrink: 0; }
-.wa-head > .bi-whatsapp { font-size: 1.15rem; }
-.wa-state { font-size: .65rem; padding: .1rem .45rem; border-radius: 999px; background: rgba(255, 255, 255, .18); white-space: nowrap; }
-.wa-state.on { background: #25D366; }
-.wa-btn { border: 0; background: transparent; color: #fff; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
-.wa-btn:hover { background: rgba(255, 255, 255, .18); }
-.wa-body { padding: .8rem; overflow-y: auto; flex-grow: 1; }
-.wa-qr { display: flex; align-items: center; gap: .7rem; padding: .6rem; border-radius: 12px; background: #E9F8EF; margin-bottom: .6rem; }
-.wa-qr-icon { position: relative; width: 56px; height: 56px; border-radius: 12px; background: #fff; display: grid; place-items: center; flex-shrink: 0; box-shadow: inset 0 0 0 2px #128C7E; }
-.wa-qr-icon .bi-qr-code { font-size: 2rem; color: #1F2D2A; }
-.wa-qr-icon .bi-whatsapp { position: absolute; font-size: .95rem; color: #25D366; background: #fff; border-radius: 50%; }
-.wa-controls { padding: .55rem .6rem; border-radius: 12px; background: var(--bg, #FBF7F1); margin-bottom: .6rem; }
-.wa-steps { padding-left: 1.1rem; margin-bottom: .5rem; }
-.wa-steps li { margin-bottom: .2rem; }
-@media (min-width: 992px) { .wa-panel { bottom: 5.5rem; right: 1.5rem; } }
-
 /* ---------- Meetings ---------- */
 .meeting-row { display: flex; align-items: center; gap: .85rem; padding: .75rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .meeting-row:last-of-type { border-bottom: 0; }
@@ -637,3 +616,142 @@ body:has(.punch-gate) { overflow: hidden; }
 .share-emp { display: flex; align-items: center; gap: .45rem; padding: .35rem .5rem; border-radius: 8px; cursor: pointer; flex-wrap: wrap; }
 .share-emp:hover { background: var(--brand-soft); }
 .share-emp-all { grid-column: 1 / -1; border-bottom: 1px dashed var(--line); border-radius: 0; }
+
+/* ---------- Logout requests ---------- */
+.logout-alert { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .65rem; border-radius: 999px; background: var(--danger); color: #fff; font-size: .75rem; font-weight: 700; text-decoration: none; }
+.logout-alert b { background: #fff; color: var(--danger); border-radius: 999px; padding: 0 .4rem; font-size: .7rem; }
+.logout-alert:hover { color: #fff; }
+.logout-alert.blink { animation: logout-blink 1s ease-in-out infinite; }
+@keyframes logout-blink { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(200, 85, 61, .6); } 50% { opacity: .55; box-shadow: 0 0 0 6px rgba(200, 85, 61, 0); } }
+.logout-req.is-pending { border-left: 4px solid var(--warning); }
+.logout-actions { width: 260px; flex-shrink: 0; }
+@media (max-width: 767.98px) { .logout-actions { width: 100%; } }
+.step-pill { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--brand); color: #fff; font-size: .65rem; margin-right: .25rem; }
+.logout-review-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom) + .75rem); z-index: 1070; width: min(560px, calc(100% - 1.5rem)); display: flex; gap: .7rem; align-items: center; padding: .7rem .9rem; border-radius: var(--radius-sm); background: #FFF4E5; border: 1px solid #F1C98A; color: #7A4B12; box-shadow: 0 8px 24px rgba(0, 0, 0, .12); }
+.decision-icon { width: 64px; height: 64px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 2rem; color: #fff; }
+.decision-icon.ok { background: var(--success); }
+.decision-icon.no { background: var(--danger); }
+.no-training-switch { display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--line); font-size: .8rem; font-weight: 600; cursor: pointer; background: var(--surface); }
+.no-training-switch:has(input:checked) { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+
+/* ---------- WhatsApp side panel ---------- */
+.wa-side { position: fixed; top: var(--topbar-h); right: 0; bottom: 0; z-index: 1036; width: 380px; max-width: 100vw; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(30, 20, 10, .12); transition: width .2s; }
+.wa-side.maximized { width: min(720px, 100vw); }
+.wa-side.minimized { top: auto; bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom) + .75rem); right: 5rem; width: 240px; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; }
+.wa-side.minimized .wa-side-body { display: none; }
+.wa-side-head { display: flex; align-items: center; gap: .45rem; padding: .6rem .7rem .6rem .9rem; border-bottom: 1px solid var(--line); flex-shrink: 0; user-select: none; }
+.wa-side-head > .bi-whatsapp { color: #25D366; font-size: 1.25rem; }
+.wa-side-head .wa-btn { border: 0; background: transparent; color: var(--ink-2); width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; }
+.wa-side-head .wa-btn:hover { background: var(--brand-soft); color: var(--ink); }
+.wa-state { font-size: .65rem; padding: .1rem .5rem; border-radius: 999px; background: #EEE7DE; color: var(--muted); white-space: nowrap; }
+.wa-state.on { background: #DCF8E6; color: #128C7E; }
+.wa-side-body { flex-grow: 1; overflow-y: auto; padding: .9rem; background: #F7F5F2; }
+.wa-hero { display: flex; align-items: center; gap: .8rem; padding: .8rem; border-radius: 14px; background: #fff; border: 1px solid var(--line); margin-bottom: .8rem; }
+.wa-hero-art { position: relative; width: 64px; height: 50px; flex-shrink: 0; display: grid; place-items: center; font-size: 2.2rem; color: #2F8F5B; }
+.wa-hero-art .bi-whatsapp { position: absolute; right: 2px; bottom: 0; font-size: 1.15rem; color: #25D366; background: #fff; border-radius: 50%; }
+.wa-login-card { padding: 1rem; border-radius: 14px; background: #fff; border: 1px solid var(--line); text-align: center; }
+.wa-qr-box { position: relative; width: 170px; height: 170px; margin: 0 auto; display: grid; place-items: center; border: 0; background: #fff; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.wa-qr-box > .bi-qr-code { font-size: 9rem; line-height: 1; color: #1F2D2A; filter: blur(2.5px); opacity: .55; }
+.wa-qr-logo { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -62%); width: 42px; height: 42px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 1.6rem; color: #25D366; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.wa-qr-cta { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: .25rem .7rem; border-radius: 999px; background: #128C7E; color: #fff; font-size: .72rem; font-weight: 700; }
+.wa-steps { text-align: left; padding-left: 1.2rem; margin-bottom: .8rem; }
+.wa-steps li { margin-bottom: .3rem; }
+.wa-big { font-size: 3rem; color: #25D366; }
+/* Desktop: the portal moves left so the WhatsApp box sits beside it */
+@media (min-width: 992px) { body.wa-docked .app-main { margin-right: 380px; transition: margin .2s; } }
+@media (max-width: 575.98px) { .wa-side:not(.minimized) { width: 100vw; } }
+@media (min-width: 992px) { .logout-review-banner { bottom: 1.25rem; } }
+
+/* ---------- Built-in meeting room ---------- */
+.meet { background: #16211F; color: #fff; border-radius: var(--radius); overflow: hidden; min-height: calc(100vh - var(--topbar-h) - 9rem); display: flex; flex-direction: column; }
+.meet-lobby { flex-grow: 1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 1.5rem; align-items: center; padding: 1.5rem; }
+.meet-preview { position: relative; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: #0E1514; }
+.meet-preview video, .meet-tile video { width: 100%; height: 100%; object-fit: cover; background: #0E1514; }
+.meet-preview video, .meet-tile.me video { transform: scaleX(-1); }
+.meet-preview-off { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: .3rem; color: rgba(255, 255, 255, .7); font-size: 2rem; }
+.meet-preview-off span { font-size: .85rem; }
+.meet-round { width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-size: 1.15rem; }
+.meet-round.off, .meet-controls .ctrl.off { background: #D9483B; }
+.meet-call { flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
+.meet-top { display: flex; align-items: center; gap: .7rem; padding: .7rem 1rem; }
+.meet-body { flex-grow: 1; display: flex; min-height: 0; padding: 0 .75rem; gap: .75rem; }
+.meet-grid { flex-grow: 1; display: grid; gap: .6rem; grid-template-columns: 1fr; grid-auto-rows: minmax(160px, 1fr); align-content: stretch; min-height: 340px; }
+.meet-grid[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.meet-grid[data-n="3"], .meet-grid[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.meet-grid[data-n="5"], .meet-grid[data-n="6"], .meet-grid[data-n="7"], .meet-grid[data-n="8"], .meet-grid[data-n="9"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.meet-tile { position: relative; border-radius: 14px; overflow: hidden; background: #0E1514; min-height: 160px; }
+.meet-avatar { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); font-size: 2.2rem; font-weight: 700; }
+.meet-name { position: absolute; left: .6rem; bottom: .6rem; padding: .2rem .6rem; border-radius: 8px; background: rgba(0, 0, 0, .55); font-size: .78rem; font-weight: 600; }
+.meet-state { position: absolute; top: .6rem; right: .6rem; padding: .15rem .5rem; border-radius: 8px; background: rgba(0, 0, 0, .55); font-size: .7rem; }
+.meet-side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; background: #1F2D2A; border-radius: 14px; overflow: hidden; }
+.meet-side-head { display: flex; gap: .2rem; padding: .4rem; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.meet-side-head button { border: 0; background: transparent; color: rgba(255, 255, 255, .7); font-size: .78rem; font-weight: 600; padding: .35rem .55rem; border-radius: 8px; }
+.meet-side-head button.active { background: rgba(255, 255, 255, .12); color: #fff; }
+.meet-side-pane { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.meet-chat { flex-grow: 1; overflow-y: auto; padding: .6rem; display: flex; flex-direction: column; gap: .45rem; }
+.meet-msg { max-width: 88%; padding: .4rem .6rem; border-radius: 10px; background: rgba(255, 255, 255, .08); font-size: .82rem; display: flex; flex-direction: column; }
+.meet-msg.mine { align-self: flex-end; background: #2E7D6B; }
+.meet-msg b { font-size: .7rem; opacity: .8; }
+.meet-msg small { font-size: .62rem; opacity: .6; align-self: flex-end; }
+.meet-chat-form { display: flex; gap: .4rem; padding: .5rem; border-top: 1px solid rgba(255, 255, 255, .08); }
+.meet-chat-form input { flex-grow: 1; border: 0; border-radius: 10px; padding: .45rem .7rem; background: rgba(255, 255, 255, .1); color: #fff; }
+.meet-chat-form button { border: 0; border-radius: 10px; background: #25D366; color: #fff; width: 40px; }
+.meet-person { display: flex; align-items: center; gap: .5rem; padding: .55rem .8rem; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: .85rem; }
+.meet-mini { width: 28px; height: 28px; border-radius: 50%; background: var(--brand); display: grid; place-items: center; font-weight: 700; font-size: .8rem; text-transform: uppercase; }
+.meet-controls { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; padding: .8rem; }
+.meet-controls .ctrl { position: relative; border: 0; background: rgba(255, 255, 255, .1); color: #fff; border-radius: 14px; padding: .5rem .75rem; min-width: 72px; display: flex; flex-direction: column; align-items: center; gap: .2rem; font-size: .7rem; text-decoration: none; }
+.meet-controls .ctrl i { font-size: 1.1rem; }
+.meet-controls .ctrl:hover { background: rgba(255, 255, 255, .2); color: #fff; }
+.meet-controls .ctrl.on { background: #2E7D6B; }
+.meet-controls .ctrl.end { background: #D9483B; }
+.meet-dot { position: absolute; top: 6px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: #25D366; }
+.meet-left { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; }
+@media (max-width: 991.98px) {
+    .meet-lobby { grid-template-columns: 1fr; padding: 1rem; }
+    .meet-side { position: absolute; inset: auto .5rem 5.5rem .5rem; width: auto; height: 55%; z-index: 5; }
+    .meet-body { position: relative; }
+    .meet-grid[data-n="3"], .meet-grid[data-n="4"], .meet-grid[data-n="5"], .meet-grid[data-n="6"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .meet-controls .ctrl { min-width: 58px; padding: .45rem .5rem; }
+    .meet-controls .ctrl span { font-size: .62rem; }
+}
+/* Customer page */
+.meet-guest-body { background: #0E1514; min-height: 100vh; display: flex; flex-direction: column; }
+.meet-guest-head { display: flex; align-items: center; gap: .7rem; padding: .7rem 1rem; color: #fff; }
+.meet-guest-head img { border-radius: 10px; }
+.meet-guest-main { flex-grow: 1; display: flex; padding: 0 .75rem .75rem; }
+.meet-guest-main > .meet, .meet-guest-main > .meet-left { flex-grow: 1; min-height: calc(100vh - 70px); color: #fff; }
+/* Nothing floats over the meeting controls during a call */
+body.in-meeting .geo-notice, body.in-meeting .wa-fab, body.in-meeting .logout-review-banner { display: none !important; }
+
+/* ---------- WhatsApp in the portal: QR + chats ---------- */
+.wa-qr-real { position: relative; width: 230px; height: 230px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.wa-qr-real img { width: 100%; height: 100%; image-rendering: pixelated; }
+.wa-qr-real .wa-qr-logo { transform: translate(-50%, -50%); }
+.wa-search { position: relative; margin: -.2rem 0 .6rem; }
+.wa-search i { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; }
+.wa-search input { width: 100%; border: 0; border-radius: 10px; padding: .5rem .8rem .5rem 2.1rem; background: #fff; box-shadow: inset 0 0 0 1px var(--line); font-size: .85rem; }
+.wa-chat-list { margin: 0 -.9rem; background: #fff; border-top: 1px solid var(--line); }
+.wa-chat { display: flex; gap: .65rem; align-items: center; width: 100%; padding: .6rem .9rem; border: 0; border-bottom: 1px solid #F1ECE6; background: #fff; text-align: left; }
+.wa-chat:hover { background: #F6F3EF; }
+.wa-av { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: #DFF2E8; color: #128C7E; font-weight: 700; text-transform: uppercase; }
+.wa-av.grp { background: #E3ECFA; color: #3B82C4; }
+.wa-chat-main { flex-grow: 1; min-width: 0; }
+.wa-chat-top, .wa-chat-bottom { display: flex; justify-content: space-between; gap: .5rem; }
+.wa-chat-top b { font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-chat-top small { font-size: .68rem; color: var(--muted); white-space: nowrap; }
+.wa-chat-bottom span { font-size: .76rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-chat-bottom em { font-style: normal; min-width: 20px; height: 20px; padding: 0 .35rem; border-radius: 999px; background: #25D366; color: #fff; font-size: .68rem; font-weight: 700; display: grid; place-items: center; }
+.wa-side-body:has([data-view="chat"]:not(.d-none)) { padding: 0; display: flex; flex-direction: column; background: #EFEAE2; }
+[data-view="chat"]:not(.d-none) { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+.wa-messages { flex-grow: 1; overflow-y: auto; padding: .8rem; display: flex; flex-direction: column; gap: .3rem; }
+.wa-msg { max-width: 82%; align-self: flex-start; background: #fff; border-radius: 10px; padding: .35rem .55rem .25rem; font-size: .84rem; box-shadow: 0 1px 1px rgba(0, 0, 0, .06); display: flex; flex-direction: column; word-wrap: break-word; }
+.wa-msg.me { align-self: flex-end; background: #D9FDD3; }
+.wa-msg b { font-size: .7rem; color: #128C7E; }
+.wa-msg small { align-self: flex-end; font-size: .62rem; color: var(--muted); }
+.wa-msg.pending { opacity: .7; }
+.wa-msg.failed { background: #FDE2E0; }
+.wa-day { align-self: center; font-size: .66rem; padding: .15rem .6rem; border-radius: 8px; background: #fff; color: var(--muted); margin: .4rem 0; }
+.wa-compose { display: flex; gap: .4rem; padding: .5rem; background: #F0F2F5; flex-shrink: 0; }
+.wa-compose input { flex-grow: 1; border: 0; border-radius: 20px; padding: .55rem .9rem; font-size: .86rem; }
+.wa-compose button { width: 42px; height: 42px; border: 0; border-radius: 50%; background: #25D366; color: #fff; }
+.wa-fab .wa-count { position: absolute; left: -6px; top: -6px; min-width: 22px; height: 22px; padding: 0 .3rem; border-radius: 999px; background: var(--danger); color: #fff; font-size: .7rem; font-weight: 700; display: grid; place-items: center; }

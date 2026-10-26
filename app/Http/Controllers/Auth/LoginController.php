@@ -50,6 +50,10 @@ class LoginController extends Controller
         $user = $request->user();
         if ($user && $user->role->portal() === 'employee') {
             $session = $attendance->todaySession($user);
+            if ($session && $session->logoutPending()) {
+                return redirect()->route('employee.attendance.today')
+                    ->with('error', 'Your logout request is under review. You can sign out once your manager / admin accepts it.');
+            }
             if ($session && $session->isOpen()) {
                 return redirect()->route('employee.attendance.today')
                     ->with('error', 'You are still punched in. Punch out first to sign out — punch-out opens when your work score reaches 100%. If you must leave early, use Exception Checkout or ask admin.');

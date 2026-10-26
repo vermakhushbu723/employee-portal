@@ -32,8 +32,13 @@
                         <td class="small text-nowrap"><i class="bi bi-{{ $m->platformIcon() }}"></i> {{ $m->platformLabel() }}</td>
                         <td><x-badge :tone="$tone">{{ $label }}</x-badge>@if ($m->status === 'live' && $m->started_at)<div class="small-xs text-muted">since {{ $m->started_at->format('h:i A') }}</div>@endif</td>
                         <td class="text-end text-nowrap">
-                            @if ($m->link && in_array($m->status, ['upcoming', 'live'], true))
-                                <a href="{{ $m->link }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Join</a>
+                            @if (in_array($m->status, ['upcoming', 'live'], true) && ($m->isPortal() || $m->link))
+                                @if ($m->isPortal())
+                                    <a href="{{ route($portal.'.meetings.room', $m) }}" class="btn btn-sm btn-primary"><i class="bi bi-camera-video"></i> Join</a>
+                                    <button type="button" class="btn btn-sm btn-light" data-copy="{{ $m->joinLink() }}" title="Copy customer join link"><i class="bi bi-link-45deg"></i></button>
+                                @else
+                                    <a href="{{ $m->link }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Join</a>
+                                @endif
                             @endif
                             @if (in_array($m->status, ['pending', 'upcoming'], true))
                                 <form method="POST" action="{{ route($portal.'.meetings.cancel', $m) }}" class="d-inline" data-confirm="Cancel this meeting?">@csrf<button class="btn btn-sm btn-outline-danger">Cancel</button></form>
@@ -77,7 +82,7 @@
                 </div>
                 <div class="col-md-4"><label class="form-label required">Date</label><input type="date" name="date" class="form-control" min="{{ today()->toDateString() }}" value="{{ old('date', today()->toDateString()) }}" required></div>
                 <div class="col-md-4"><label class="form-label required">Time</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required></div>
-                <div class="col-12"><label class="form-label">Meeting link</label><input type="url" name="link" class="form-control" value="{{ old('link') }}" placeholder="https://meet.google.com/…"></div>
+                <div class="col-12"><label class="form-label">Meeting link <span class="small text-muted fw-normal">(only for Google Meet / Zoom / Teams — Portal Meeting joins inside the dashboard)</span></label><input type="url" name="link" class="form-control" value="{{ old('link') }}" placeholder="https://meet.google.com/…"></div>
                 <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" rows="2" class="form-control" maxlength="1000">{{ old('notes') }}</textarea></div>
             </div>
             <div class="modal-footer border-0">

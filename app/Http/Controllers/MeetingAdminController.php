@@ -47,7 +47,7 @@ class MeetingAdminController extends Controller
             'city' => ['nullable', 'string', 'max:80'],
             'title' => ['required', 'string', 'max:150'],
             'platform' => ['required', Rule::in(array_keys(Meeting::PLATFORMS))],
-            'link' => ['nullable', 'url', 'max:500'],
+            'link' => ['nullable', 'url', 'max:500'],   // only for Google Meet / Zoom / Teams
             'date' => ['required', 'date', 'after_or_equal:today'],
             'time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -71,6 +71,17 @@ class MeetingAdminController extends Controller
         $audit->log('meeting.assign', "Assigned meeting \"{$meeting->title}\" to {$employee->employee_code}");
 
         return back()->with('success', "Meeting request sent to {$employee->name}. It shows as Pending until they accept.");
+    }
+
+    /** Admin / manager join a built-in meeting inside their dashboard. */
+    public function room(Request $request, Meeting $meeting)
+    {
+        abort_unless(app(\App\Services\MeetingRoomService::class)->canJoin($request->user(), $meeting->load('user.employee')), 403);
+        if (! $meeting->isPortal()) {
+            return $meeting->link ? redirect()->away($meeting->link) : back()->with('error', 'This meeting has no link yet.');
+        }
+
+        return view('meetings.room', ['m' => $meeting, 'portal' => $request->user()->role->portal()]);
     }
 
     public function cancel(Request $request, Meeting $meeting)

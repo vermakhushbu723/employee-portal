@@ -45,6 +45,9 @@
     @include('partials.whatsapp-panel')
     @include('partials.install-banner')
     @include('partials.punch-gate')
+    @if (auth()->user()->role->portal() === 'employee')
+        @include('partials.logout-status')
+    @endif
 
     {{-- Real-time notifications (filled by public/js/app.js) --}}
     <div class="toast-container live-toasts" id="liveToasts" aria-live="polite"></div>

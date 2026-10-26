@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Meeting extends Model
 {
     public const PLATFORMS = [
+        // Built-in room: video call inside the dashboard, customer joins with a link (no app / login)
+        'portal' => ['Portal Meeting', 'camera-video-fill', null],
         'google_meet' => ['Google Meet', 'camera-video-fill', 'https://meet.google.com/new'],
         'zoom' => ['Zoom', 'camera-reels-fill', 'https://zoom.us/start/videomeeting'],
         'teams' => ['Teams', 'microsoft-teams', 'https://teams.microsoft.com/v2/'],
@@ -24,8 +26,30 @@ class Meeting extends Model
 
     protected $fillable = [
         'user_id', 'created_by', 'lead_id', 'customer_name', 'customer_mobile', 'city', 'title',
-        'platform', 'link', 'scheduled_at', 'notes', 'status', 'started_at', 'ended_at',
+        'platform', 'link', 'scheduled_at', 'notes', 'status', 'started_at', 'ended_at', 'room_token',
     ];
+
+    protected static function booted(): void
+    {
+        // Every portal meeting gets a secret join link for the customer
+        static::saving(function (Meeting $m) {
+            if ($m->platform === 'portal' && ! $m->room_token) {
+                $m->room_token = \Illuminate\Support\Str::random(32);
+            }
+        });
+    }
+
+    /** Joins inside the dashboard (built-in room) instead of an outside link. */
+    public function isPortal(): bool
+    {
+        return $this->platform === 'portal';
+    }
+
+    /** Link to send to the customer (portal room) or the outside meeting link. */
+    public function joinLink(): ?string
+    {
+        return $this->isPortal() ? route('meet.guest', $this->room_token) : $this->link;
+    }
 
     protected function casts(): array
     {

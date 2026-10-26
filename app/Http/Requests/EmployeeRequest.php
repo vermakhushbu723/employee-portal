@@ -44,14 +44,16 @@ class EmployeeRequest extends FormRequest
             'shift_id' => ['nullable', Rule::in(array_merge(Shift::pluck('id')->map(fn ($id) => (string) $id)->all(), ['custom']))],
             'custom_start' => ['nullable', 'required_if:shift_id,custom', 'date_format:H:i'],
             'custom_end' => ['nullable', 'required_if:shift_id,custom', 'date_format:H:i', 'different:custom_start'],
-            'custom_hours' => ['nullable', 'required_if:shift_id,custom', 'numeric', 'min:1', 'max:16'],
+            'custom_hours' => ['nullable'],   // calculated from start / end / break (see shiftMinutes)
+            'no_training' => ['nullable', 'boolean'],
             'custom_break' => ['nullable', 'integer', 'min:0', 'max:180'],
             'manager_id' => ['nullable', 'exists:users,id', Rule::notIn(array_filter([$user?->id]))],
             'designation' => ['nullable', 'string', 'max:100'],
             'work_type' => ['required', Rule::in(['work_from_home', 'office', 'field'])],
             'training_from' => ['nullable', 'date', 'required_with:training_to'],
             'training_to' => ['nullable', 'date', 'required_with:training_from', 'after_or_equal:training_from'],
-            'joining_date' => ['nullable', 'date', Rule::when($this->filled('training_to'), 'after_or_equal:training_to')],
+            // With training the joining date comes after the training end
+            'joining_date' => ['nullable', 'date', Rule::when($this->filled('training_to'), 'after:training_to')],
             'monthly_salary' => ['nullable', 'numeric', 'min:0'],
             'target_leads' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'target_interested' => ['nullable', 'integer', 'min:0', 'max:1000'],
@@ -83,14 +85,25 @@ class EmployeeRequest extends FormRequest
 
         $start = $this->validated('custom_start').':00';
         $end = $this->validated('custom_end').':00';
-        $minutes = (int) round(((float) $this->validated('custom_hours')) * 60);
         $break = (int) ($this->validated('custom_break') ?? 60);
+        $minutes = self::shiftMinutes($start, $end, $break);
         $label = Carbon::parse($start)->format('h:i A').' - '.Carbon::parse($end)->format('h:i A').' ('.rtrim(rtrim(number_format($minutes / 60, 1), '0'), '.').'h)';
 
         return Shift::firstOrCreate(
             ['start_time' => $start, 'end_time' => $end, 'required_minutes' => $minutes, 'break_allowed_minutes' => $break, 'is_custom' => true],
             ['name' => "Custom {$label}", 'grace_minutes' => 15, 'checkin_opens_minutes' => 5],
         )->id;
+    }
+
+    /** Working minutes of a shift = (end − start, overnight allowed) − break. */
+    public static function shiftMinutes(string $start, string $end, int $break): int
+    {
+        $span = (Carbon::parse($end)->getTimestamp() - Carbon::parse($start)->getTimestamp()) / 60;
+        if ($span <= 0) {
+            $span += 24 * 60;
+        }
+
+        return (int) max(0, round($span - $break));
     }
 
     /** Daily work targets (lead creation + interested/mature) for the work score. */
@@ -102,9 +115,24 @@ class EmployeeRequest extends FormRequest
         ], fn ($v) => $v !== null && $v !== '');
     }
 
+    /** "No training" clears the training dates. */
+    protected function prepareForValidation(): void
+    {
+        if ($this->boolean('no_training')) {
+            $this->merge(['training_from' => null, 'training_to' => null]);
+        }
+    }
+
     public function after(): array
     {
         return [function ($validator) {
+            // Custom shift: the break must be shorter than the shift
+            if ($this->input('shift_id') === 'custom' && $this->filled(['custom_start', 'custom_end'])
+                && preg_match('/^\d{2}:\d{2}$/', $this->input('custom_start')) && preg_match('/^\d{2}:\d{2}$/', $this->input('custom_end'))
+                && self::shiftMinutes($this->input('custom_start'), $this->input('custom_end'), (int) $this->input('custom_break', 60)) < 60) {
+                $validator->errors()->add('custom_end', 'The shift must give at least 1 working hour after the break.');
+            }
+
             // An admin cannot change their own role (they would lock themselves out).
             $user = $this->editing();
             $current = $user?->custom_role_id ? "custom:{$user->custom_role_id}" : $user?->role->value;
@@ -118,7 +146,7 @@ class EmployeeRequest extends FormRequest
     {
         return [
             'training_to.after_or_equal' => 'Training end date must be on or after the start date.',
-            'joining_date.after_or_equal' => 'Joining date must be on or after the training end date.',
+            'joining_date.after' => 'Joining date must be after the training end date.',
             'manager_id.not_in' => 'An employee cannot report to themselves.',
             'custom_start.required_if' => 'Enter the shift start time.',
             'custom_end.required_if' => 'Enter the shift end time.',

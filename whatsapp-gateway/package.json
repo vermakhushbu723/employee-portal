@@ -1,0 +1,14 @@
+{
+  "name": "portal-whatsapp-gateway",
+  "private": true,
+  "description": "Keeps each portal user's WhatsApp (linked device via QR) connected and serves chats to the portal.",
+  "type": "module",
+  "main": "server.mjs",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "pino": "9.6.0",
+    "qrcode": "1.5.4"
+  }
+}

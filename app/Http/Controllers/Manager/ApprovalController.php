@@ -6,7 +6,6 @@ use App\Enums\LeaveStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceSession;
 use App\Models\LeaveRequest;
-use App\Services\AuditLogger;
 use App\Services\LeaveService;
 use Illuminate\Http\Request;
 
@@ -21,7 +20,7 @@ class ApprovalController extends Controller
 
         return view('manager.approvals', [
             'leaves' => LeaveRequest::with('user')->whereIn('user_id', $teamIds)->where('status', LeaveStatus::Pending)->oldest('from_date')->get(),
-            'checkouts' => AttendanceSession::with('user')->whereIn('user_id', $teamIds)->where('review_status', 'pending')->latest('work_date')->get(),
+            'checkouts' => AttendanceSession::with('user')->whereIn('user_id', $teamIds)->whereIn('review_status', ['pending', 'verified'])->latest('work_date')->get(),
         ]);
     }
 
@@ -38,20 +37,6 @@ class ApprovalController extends Controller
         $this->leaves->reject($this->teamLeave($request, $leave), $request->user(), $data['rejection_reason']);
 
         return back()->with('success', 'Leave rejected.');
-    }
-
-    public function reviewCheckout(Request $request, int $session, AuditLogger $audit)
-    {
-        $data = $request->validate(['decision' => ['required', 'in:approved,rejected']]);
-
-        $session = AttendanceSession::whereIn('user_id', $request->user()->teamMembers()->pluck('id'))
-            ->where('review_status', 'pending')
-            ->findOrFail($session);
-
-        $session->update(['review_status' => $data['decision'], 'reviewed_by' => $request->user()->id]);
-        $audit->log('attendance.review', "Exception checkout #{$session->id} {$data['decision']}", ['session_id' => $session->id]);
-
-        return back()->with('success', 'Exception checkout '.$data['decision'].'.');
     }
 
     private function teamLeave(Request $request, int $id): LeaveRequest

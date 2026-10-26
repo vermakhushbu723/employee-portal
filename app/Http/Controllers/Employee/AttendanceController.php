@@ -63,7 +63,18 @@ class AttendanceController extends Controller
 
         $this->attendance->checkOut($request->user(), true, '['.str_replace('_', ' ', $data['type']).'] '.$data['reason']);
 
-        return back()->with('success', 'Exception checkout recorded and sent to your manager for review.');
+        return back()->with('success', 'Logout request sent. It stays under review until your manager / admin verifies it — you will see a message here once it is accepted.');
+    }
+
+    /** Employee closed the "logout request accepted / rejected" popup. */
+    public function decisionSeen(Request $request)
+    {
+        $session = $this->attendance->todaySession($request->user());
+        if ($session && in_array($session->review_status, ['approved', 'rejected'], true)) {
+            $session->forceFill(['decision_seen_at' => now()])->saveQuietly();
+        }
+
+        return response()->noContent();
     }
 
     /** Screen 10 — monthly attendance calendar. */

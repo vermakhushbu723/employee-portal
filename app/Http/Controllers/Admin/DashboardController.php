@@ -20,8 +20,10 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request, LiveStatusService $live)
     {
+        $team = $request->integer('team') ?: null;   // "All Teams" filter (department)
         $staff = User::whereIn('role', [Role::Employee->value, Role::TeamLeader->value])
             ->where('status', 'active')
+            ->when($team, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $team)))
             ->with('employee.department', 'employee.manager')
             ->orderBy('name')
             ->get();
@@ -33,6 +35,8 @@ class DashboardController extends Controller
         }
 
         return view('admin.dashboard', [
+            'team' => $team,
+            'teams' => \App\Models\Department::where('status', 'active')->orderBy('name')->get(['id', 'name']),
             'rows' => $rows,
             'summary' => $live->summary($rows),
             'departments' => self::byDepartment($rows),

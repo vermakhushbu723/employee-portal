@@ -22,33 +22,14 @@
     @endforelse
 </div>
 
-<div class="card-soft card-pad">
-    <h3 class="section-title mb-2">Exception Checkouts ({{ $checkouts->count() }})</h3>
-    @forelse ($checkouts as $session)
-        <div class="list-row flex-wrap">
-            <span class="avatar tone-warning">{{ $session->user->initials }}</span>
-            <div class="flex-grow-1 min-w-0">
-                <div class="list-title">{{ $session->user->name }} <span class="small text-muted">· {{ $session->work_date->format('d M Y') }}</span></div>
-                <div class="small text-muted">
-                    {{ $session->check_in_at->format('h:i A') }} – {{ $session->check_out_at?->format('h:i A') }}
-                    · Worked {{ Duration::minutes($session->worked_minutes) }}
-                </div>
-                <div class="small">{{ $session->checkout_reason }}</div>
-            </div>
-            <div class="d-flex gap-2">
-                @foreach (['approved' => ['Approve', 'success'], 'rejected' => ['Reject', 'outline-danger']] as $decision => [$label, $style])
-                    <form method="POST" action="{{ route('manager.approvals.checkouts.review', $session) }}">
-                        @csrf
-                        <input type="hidden" name="decision" value="{{ $decision }}">
-                        <button class="btn btn-sm btn-{{ $style }}">{{ $label }}</button>
-                    </form>
-                @endforeach
-            </div>
-        </div>
-    @empty
-        <x-empty-state icon="box-arrow-right" title="No exception checkouts to review" />
-    @endforelse
-</div>
+<a href="{{ route('manager.logout-requests.index') }}" class="card-soft card-pad d-flex align-items-center gap-3 text-decoration-none text-dark mb-3">
+    <span class="icon-box lg tone-warning"><i class="bi bi-box-arrow-right"></i></span>
+    <div class="flex-grow-1">
+        <div class="fw-bold">Logout Requests ({{ $checkouts->count() }} under review)</div>
+        <div class="small text-muted">Early logout / exception checkouts are verified in 2 steps on the Logout Requests page.</div>
+    </div>
+    <span class="btn btn-sm btn-primary">Open</span>
+</a>
 
 @include('partials.reject-leave-modal')
 @endsection

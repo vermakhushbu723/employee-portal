@@ -55,8 +55,8 @@
                         <div class="small-xs text-muted">{{ $m->scheduled_at->format('d M, h:i A') }} · {{ $m->user->name }} ({{ $m->user->employee_code }})</div>
                     </div>
                     <x-badge :tone="$mTone">{{ $mLabel }}</x-badge>
-                    @if ($m->link && in_array($m->status, ['upcoming', 'live'], true))
-                        <a href="{{ $m->link }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Join</a>
+                    @if (in_array($m->status, ['upcoming', 'live'], true) && ($m->isPortal() || $m->link))
+                        <a href="{{ $m->isPortal() ? route('manager.meetings.room', $m) : $m->link }}" @unless ($m->isPortal()) target="_blank" rel="noopener" @endunless class="btn btn-sm btn-primary">Join</a>
                     @endif
                 </div>
             @empty

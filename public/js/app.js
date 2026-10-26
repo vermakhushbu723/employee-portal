@@ -127,6 +127,65 @@
         select.addEventListener('change', () => box.classList.toggle('d-none', select.value !== 'custom'));
     });
 
+    // Custom shift: working hours = (end − start, overnight allowed) − break, filled automatically
+    document.querySelectorAll('[data-shift-calc]').forEach((box) => {
+        const start = box.querySelector('[name=custom_start]');
+        const end = box.querySelector('[name=custom_end]');
+        const brk = box.querySelector('[name=custom_break]');
+        const out = box.querySelector('[data-shift-hours]');
+        const note = box.querySelector('[data-shift-note]');
+        const mins = (t) => { const [h, m] = (t || '').split(':').map(Number); return h * 60 + m; };
+        const hm = (n) => `${Math.floor(n / 60)}h${n % 60 ? ` ${n % 60}m` : ''}`;
+        const calc = () => {
+            if (!start.value || !end.value) return;
+            let span = mins(end.value) - mins(start.value);
+            if (span <= 0) span += 24 * 60;
+            const work = Math.max(0, span - (Number(brk.value) || 0));
+            out.value = Math.round(work / 6) / 10; // hours, 1 decimal
+            note.textContent = `${hm(span)} shift − ${Number(brk.value) || 0} min break = ${hm(work)} working.`;
+            note.classList.toggle('text-danger', work < 60);
+        };
+        [start, end, brk].forEach((el) => el.addEventListener('input', calc));
+        calc();
+    });
+
+    // Training & joining: "No training" switch; joining = next working day after training ends
+    document.querySelectorAll('[data-no-training]').forEach((toggle) => {
+        const box = document.querySelector('[data-training-box]');
+        const from = box.querySelector('[name=training_from]');
+        const to = box.querySelector('[name=training_to]');
+        const join = box.querySelector('[name=joining_date]');
+        const hint = box.querySelector('[data-join-hint]');
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const nextWorkingDay = (value) => {
+            const d = new Date(`${value}T00:00:00`);
+            do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0); // Sunday is the weekly off
+            return iso(d);
+        };
+        const sync = (fillJoin) => {
+            const off = toggle.checked;
+            [from, to].forEach((el) => {
+                el.disabled = off;
+                el.closest('.col-md-4').classList.toggle('opacity-50', off);
+                if (off) el.value = '';
+            });
+            if (!off && to.value) {
+                const min = nextWorkingDay(to.value);
+                join.min = min;
+                if (fillJoin || !join.value || join.value < min) join.value = min;
+                hint.textContent = '(after training)';
+            } else {
+                join.removeAttribute('min');
+                hint.textContent = off ? '(work starts here)' : '';
+            }
+            if (!off && from.value) to.min = from.value;
+        };
+        toggle.addEventListener('change', () => sync(false));
+        to.addEventListener('change', () => sync(true));
+        from.addEventListener('change', () => { if (to.value && to.value < from.value) to.value = from.value; sync(true); });
+        sync(false);
+    });
+
     // Employee form: warn when an admin-portal role (HR / Super Admin, or a custom role based on them) is chosen.
     document.querySelectorAll('[data-role-warning]').forEach((select) => {
         const warning = document.querySelector(select.dataset.roleWarning);
@@ -236,6 +295,20 @@
     }
 
     const csrf = () => document.querySelector('meta[name=csrf-token]')?.content;
+
+    /* ------------------------------------------------------------------ Auto-show popups (e.g. logout decision) */
+    const autoShow = () => document.querySelectorAll('.modal[data-autoshow]:not(.shown-once)').forEach((m) => {
+        if (!window.bootstrap) return;
+        m.classList.add('shown-once');
+        bootstrap.Modal.getOrCreateInstance(m).show();
+        if (m.dataset.seenUrl) {
+            m.addEventListener('hidden.bs.modal', () => {
+                fetch(m.dataset.seenUrl, { method: 'POST', body: new URLSearchParams({ _token: csrf() }), credentials: 'same-origin' }).catch(() => {});
+            }, { once: true });
+        }
+    });
+    document.addEventListener('live:updated', autoShow);
+    window.addEventListener('load', autoShow);
 
     /* ------------------------------------------------------------------ Inline lead status */
     // Changing the dropdown saves at once; "Follow-up" first asks for a date. The list then refreshes,
