@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Employee;
 
 use App\Http\Controllers\Controller;
+use App\Enums\LeadStatus;
 use App\Models\Lead;
 use App\Models\Meeting;
 use App\Services\AuditLogger;
+use App\Services\MeetingPeopleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -16,6 +18,7 @@ class MeetingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        MeetingPeopleService::closeMissed();
         $tab = in_array($request->query('tab'), ['upcoming', 'past', 'requests'], true) ? $request->query('tab') : 'upcoming';
 
         $mine = fn () => Meeting::where('user_id', $user->id);
@@ -29,14 +32,18 @@ class MeetingController extends Controller
         return view('employee.meetings.index', [
             'tab' => $tab,
             'counts' => collect($scopes)->map(fn ($s) => $s($mine())->count()),
-            'meetings' => $scopes[$tab]($mine())->with('creator')->paginate(15)->withQueryString(),
+            'meetings' => $scopes[$tab]($mine())->with('creator', 'participants')->paginate(15)->withQueryString(),
             'live' => $mine()->where('status', 'live')->first(),
-            'leads' => Lead::ownedBy($user)->whereIn('status', ['interested', 'follow_up', 'new', 'converted'])->orderByDesc('updated_at')->limit(200)->get(['id', 'name', 'mobile', 'city']),
+            'leads' => Lead::ownedBy($user)->whereIn('status', ['interested', 'follow_up', 'new', 'converted'])->orderByDesc('updated_at')->limit(200)->get(['id', 'name', 'mobile', 'city', 'email']),
             'platforms' => Meeting::PLATFORMS,
+            'managers' => MeetingPeopleService::managers(),
+            'myManagerId' => $user->employee?->manager_id,
+            'outcomes' => MeetingPeopleService::OUTCOMES,
+            'forLead' => $request->integer('lead') ? Lead::ownedBy($user)->find($request->integer('lead')) : null,
         ]);
     }
 
-    public function store(Request $request, AuditLogger $audit)
+    public function store(Request $request, AuditLogger $audit, MeetingPeopleService $people)
     {
         $data = $this->validated($request);
         $lead = ! empty($data['lead_id']) ? Lead::ownedBy($request->user())->find($data['lead_id']) : null;
@@ -57,7 +64,19 @@ class MeetingController extends Controller
         ]);
         $audit->log('meeting.book', "Booked meeting \"{$meeting->title}\" with {$meeting->customer_name} on {$meeting->scheduled_at->format('d M h:i A')}");
 
-        return redirect()->route('employee.meetings.index')->with('success', "Meeting booked for {$meeting->scheduled_at->format('d M, h:i A')}.".($meeting->link ? ' Send the link to the customer from the list.' : ' Add the meeting link before it starts.'));
+        $people->setParticipants($meeting, $data['primary_manager_id'] ?? null, $data['managers'] ?? []);
+        if ($lead && $lead->status !== LeadStatus::Meeting && ! in_array($lead->status->value, LeadStatus::positive(), true)) {
+            $lead->update(['status' => LeadStatus::Meeting, 'next_action_at' => $meeting->scheduled_at, 'next_action_type' => 'meeting']);
+        } elseif ($lead) {
+            $lead->update(['next_action_at' => $meeting->scheduled_at, 'next_action_type' => 'meeting']);
+        }
+        $sent = $people->notify($meeting->load('participants'), $request->user(), self::splitList($data['notify_emails'] ?? ''), self::splitList($data['notify_numbers'] ?? ''));
+        $ok = collect($sent)->where('ok', true)->count();
+        $manual = collect($sent)->whereNotNull('link');
+
+        return redirect()->route('employee.meetings.index')
+            ->with('success', "Meeting booked for {$meeting->scheduled_at->format('d M, h:i A')}.".($sent ? " Invite sent to {$ok} of ".count($sent).'.' : ''))
+            ->with('wa_links', $manual->values()->all());
     }
 
     public function update(Request $request, int $meeting)
@@ -120,9 +139,21 @@ class MeetingController extends Controller
     public function end(Request $request, int $meeting)
     {
         $m = $this->find($request, $meeting);
-        $m->update(['status' => 'completed', 'ended_at' => now(), 'started_at' => $m->started_at ?? now()]);
+        $data = $request->validate([
+            'outcome' => ['nullable', Rule::in(array_keys(MeetingPeopleService::OUTCOMES))],
+            'outcome_note' => ['nullable', 'string', 'max:500'],
+        ]);
+        $started = $m->started_at;
+        $m->update([
+            'status' => 'completed',
+            'ended_at' => now(),
+            'started_at' => $started ?? now(),
+            'duration_seconds' => $started ? $started->diffInSeconds(now(), true) : 0,
+            'outcome' => $data['outcome'] ?? ($started ? 'success' : 'not_connected'),
+            'outcome_note' => $data['outcome_note'] ?? null,
+        ]);
 
-        return redirect()->route('employee.meetings.index')->with('success', 'Meeting ended ('.$m->started_at->diffForHumans($m->ended_at, true).').');
+        return redirect()->route('employee.meetings.index')->with('success', 'Meeting ended — '.MeetingPeopleService::OUTCOMES[$m->outcome][0].', duration '.$m->durationLabel().'.');
     }
 
     private function find(Request $request, int $id): Meeting
@@ -143,6 +174,17 @@ class MeetingController extends Controller
             'date' => ['required', 'date', 'after_or_equal:today'],
             'time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'primary_manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'managers' => ['nullable', 'array'],
+            'managers.*' => ['integer', 'exists:users,id'],
+            'notify_emails' => ['nullable', 'string', 'max:1000'],
+            'notify_numbers' => ['nullable', 'string', 'max:500'],
         ], ['customer_name.required_without' => 'Choose a lead or type the customer name.']);
+    }
+
+    /** "a@x.com, b@y.com" / numbers on new lines → list */
+    public static function splitList(string $value): array
+    {
+        return array_values(array_filter(array_map('trim', preg_split('/[\s,;]+/', $value))));
     }
 }

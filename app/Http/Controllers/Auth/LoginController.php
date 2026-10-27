@@ -48,7 +48,7 @@ class LoginController extends Controller
     public function destroy(Request $request, AuditLogger $audit, \App\Services\AttendanceService $attendance)
     {
         $user = $request->user();
-        if ($user && $user->role->portal() === 'employee') {
+        if ($user && $user->tracksAttendance()) {
             $session = $attendance->todaySession($user);
             if ($session && $session->logoutPending()) {
                 return redirect()->route('employee.attendance.today')

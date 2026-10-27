@@ -21,12 +21,14 @@ class DashboardController extends Controller
     public function __invoke(Request $request, LiveStatusService $live)
     {
         $team = $request->integer('team') ?: null;   // "All Teams" filter (department)
-        $staff = User::whereIn('role', [Role::Employee->value, Role::TeamLeader->value])
+        $staff = User::whereIn('role', [Role::Employee->value, Role::TeamLeader->value, Role::Manager->value])
             ->where('status', 'active')
             ->when($team, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $team)))
             ->with('employee.department', 'employee.manager')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn ($u) => $u->role !== Role::Manager || $u->tracksAttendance())   // managers with punch in / out
+            ->values();
 
         $rows = $live->rows($staff);
 

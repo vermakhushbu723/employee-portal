@@ -116,7 +116,7 @@
     // Lead status modal: follow-up date only when status = follow_up.
     document.querySelectorAll('[data-follow-up-toggle]').forEach((select) => {
         const target = document.querySelector(select.dataset.followUpToggle);
-        const sync = () => target.classList.toggle('d-none', select.value !== 'follow_up');
+        const sync = () => target.classList.toggle('d-none', !['follow_up', 'callback'].includes(select.value));
         select.addEventListener('change', sync);
         sync();
     });
@@ -296,6 +296,17 @@
 
     const csrf = () => document.querySelector('meta[name=csrf-token]')?.content;
 
+    /* ------------------------------------------------------------------ Dropdowns inside tables */
+    // A menu inside a scrolling table would be clipped and turn the table into a small scroll box
+    // (rows disappear). Such menus float above the page instead ("fixed" positioning).
+    document.addEventListener('click', (e) => {
+        const toggle = e.target.closest('[data-bs-toggle="dropdown"]');
+        if (!toggle || !window.bootstrap || !toggle.closest('.table-responsive, .meet, .track-list')) return;
+        if (!bootstrap.Dropdown.getInstance(toggle)) {
+            bootstrap.Dropdown.getOrCreateInstance(toggle, { popperConfig: (d) => ({ ...d, strategy: 'fixed' }) });
+        }
+    }, true);
+
     /* ------------------------------------------------------------------ Auto-show popups (e.g. logout decision) */
     const autoShow = () => document.querySelectorAll('.modal[data-autoshow]:not(.shown-once)').forEach((m) => {
         if (!window.bootstrap) return;
@@ -336,14 +347,14 @@
         if (!select) return;
         const form = select.form;
         const pick = form.querySelector('.follow-up-pick');
-        if (select.value === 'follow_up') {
+        if (['follow_up', 'callback'].includes(select.value) && pick) {
             pick.classList.remove('d-none');
             const date = pick.querySelector('input');
-            date.required = true;
+            date.required = select.value === 'follow_up';
             date.focus();
             return;
         }
-        pick.classList.add('d-none');
+        pick?.classList.add('d-none');
         saveStatus(form);
     });
 
@@ -420,11 +431,12 @@
             let el = document.getElementById('geoNotice');
             if (!show) { el?.remove(); return; }
             if (el) return;
+            try { if (sessionStorage.getItem('portal:geoDismissed')) return; } catch (e) { /* ignore */ } // closed once: not again this session
             el = document.createElement('div');
             el.id = 'geoNotice';
             el.className = 'geo-notice';
             el.innerHTML = '<i class="bi bi-geo-alt-fill"></i><div><b>Location access is off.</b> Allow location for this site in your browser settings — your manager sees it on the live dashboard.</div><button type="button" class="btn-close btn-sm" aria-label="Close"></button>';
-            el.querySelector('button').addEventListener('click', () => el.remove());
+            el.querySelector('button').addEventListener('click', () => { el.remove(); try { sessionStorage.setItem('portal:geoDismissed', '1'); } catch (e) { /* ignore */ } });
             document.body.appendChild(el);
         };
         const startGeo = () => {

@@ -83,6 +83,7 @@ class LiveStatusService
     /** One live row per user (today). */
     public function rows(Collection $users): Collection
     {
+        app(AttendanceService::class)->closeDueSessions();   // auto punch-out of shifts that are over
         $ids = $users->pluck('id');
         $sessions = AttendanceSession::with('breaks')->whereIn('user_id', $ids)->whereDate('work_date', today())->get()->keyBy('user_id');
 

@@ -136,6 +136,7 @@ class DataImportService
             foreach (array_chunk(array_values($fresh), 500) as $chunk) {
                 Lead::insert(array_map(fn ($r) => $r + [
                     'batch_id' => $batch->id,
+                    'department_id' => $batch->department_id,
                     'created_by' => $admin->id,
                     'status' => LeadStatus::New->value,
                     'created_at' => $now,

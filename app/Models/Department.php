@@ -29,6 +29,12 @@ class Department extends Model
     }
 
     /** Bootstrap icon for the department (sidebar, cards, headers). */
+    /** HR / recruitment departments use candidate wording. */
+    public function isHr(): bool
+    {
+        return in_array(strtoupper((string) $this->code), ['HRR', 'HRD', 'HR'], true) || str_contains(strtolower($this->name), 'recruit');
+    }
+
     public function icon(): string
     {
         $name = strtolower($this->name);

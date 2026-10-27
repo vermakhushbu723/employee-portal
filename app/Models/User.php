@@ -12,7 +12,14 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class User extends Authenticatable
 {
     protected $fillable = [
-        'employee_code', 'name', 'email', 'mobile', 'role', 'custom_role_id', 'status', 'password', 'last_login_at',
+        'employee_code', 'name', 'email', 'mobile', 'role', 'custom_role_id', 'status', 'password', 'last_login_at', 'features',
+    ];
+
+    /** Employee sections admin can also give a manager / team leader (and take from an employee). */
+    public const FEATURES = [
+        'attendance' => ['Punch In / Out & work time', 'fingerprint', 'Punch-in popup, active / inactive time, breaks, shift timer'],
+        'leads' => ['My Leads', 'people', 'Own leads list, calls, WhatsApp / email, status'],
+        'meetings' => ['Meetings', 'camera-video', 'Book and join customer meetings'],
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -22,6 +29,7 @@ class User extends Authenticatable
         return [
             'role' => Role::class,
             'last_login_at' => 'datetime',
+            'features' => 'array',
             'password' => 'hashed',
             'last_active_at' => 'datetime',
             'battery_charging' => 'boolean',
@@ -106,6 +114,25 @@ class User extends Authenticatable
     public function teamMembers(): Builder
     {
         return static::query()->whereHas('employee', fn (Builder $q) => $q->where('manager_id', $this->id));
+    }
+
+    /** Employees have every section unless admin removed one; managers / team leaders only the ticked ones. */
+    public function hasFeature(string $feature): bool
+    {
+        if ($this->role->portal() === 'admin') {
+            return false;
+        }
+        if ($this->features === null) {
+            return $this->role->portal() === 'employee';
+        }
+
+        return in_array($feature, $this->features, true);
+    }
+
+    /** Punch in / out, active time, breaks and the status bar apply to this user. */
+    public function tracksAttendance(): bool
+    {
+        return $this->hasFeature('attendance');
     }
 
     public function currentShift(): Shift

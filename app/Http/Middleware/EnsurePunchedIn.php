@@ -22,7 +22,7 @@ class EnsurePunchedIn
     {
         $user = $request->user();
 
-        if ($user->role->portal() !== 'employee' || $request->routeIs(...self::ALLOWED) || ! $this->attendance->mustPunchIn($user)) {
+        if (! $user->tracksAttendance() || $request->routeIs(...self::ALLOWED) || ! $this->attendance->mustPunchIn($user)) {
             return $next($request);
         }
 
@@ -30,6 +30,6 @@ class EnsurePunchedIn
             return response()->json(['message' => 'Please punch in first.'], 423);
         }
 
-        return redirect()->route('employee.dashboard')->withErrors(['action' => 'Please punch in first to start working.']);
+        return redirect()->route($user->role->portal() === 'employee' ? 'employee.dashboard' : 'employee.attendance.today')->withErrors(['action' => 'Please punch in first to start working.']);
     }
 }

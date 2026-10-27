@@ -89,7 +89,7 @@
     const addTile = (id, name) => {
         const tile = document.createElement('div');
         tile.className = 'meet-tile';
-        tile.innerHTML = `<video autoplay playsinline></video><div class="meet-avatar">${esc(name[0] || '?')}</div><span class="meet-name">${esc(name)}</span><span class="meet-state">Connecting…</span>`;
+        tile.innerHTML = `<video autoplay playsinline></video><div class="meet-avatar">${esc(name[0] || '?')}</div><span class="meet-name">${esc(name)}</span><span class="meet-state">Connecting…</span><button type="button" class="meet-fs" data-tile-fs title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>`;
         $('[data-grid]').appendChild(tile);
         return tile;
     };
@@ -321,6 +321,26 @@
         $('[data-rejoin]').classList.toggle('d-none', title === 'The meeting has ended');
         document.body.classList.remove('in-meeting');
     };
+
+    /* ---------------- full screen: the whole meeting, or one video (button or double-tap) */
+    const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+    const toggleFs = (el) => {
+        if (fsElement()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (req) req.call(el).catch?.(() => {});
+        else { const v = el.querySelector('video'); v?.webkitEnterFullscreen?.(); } // iPhone: video only
+    };
+    $('[data-fullscreen]').addEventListener('click', () => toggleFs(root));
+    root.addEventListener('click', (e) => { const b = e.target.closest('[data-tile-fs]'); if (b) toggleFs(b.closest('.meet-tile')); });
+    root.addEventListener('dblclick', (e) => { const t = e.target.closest('.meet-tile'); if (t) toggleFs(t); });
+    const fsSync = () => {
+        const on = !!fsElement();
+        const b = $('[data-fullscreen]');
+        b.querySelector('i').className = `bi bi-${on ? 'fullscreen-exit' : 'arrows-fullscreen'}`;
+        b.querySelector('span').textContent = on ? 'Exit Full' : 'Full Screen';
+    };
+    document.addEventListener('fullscreenchange', fsSync);
+    document.addEventListener('webkitfullscreenchange', fsSync);
 
     $('[data-join]').addEventListener('click', join);
     $('[data-leave]').addEventListener('click', () => leave());

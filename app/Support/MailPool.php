@@ -34,6 +34,10 @@ class MailPool
                 return true;
             } catch (Throwable $e) {
                 Log::error("{$what} failed via {$mailer}: ".$e->getMessage());
+                // The recipient address itself was refused (e.g. 550 / 553 / 554): other mailboxes will fail too
+                if (preg_match('/code "(550|551|553|554)"/', $e->getMessage())) {
+                    return false;
+                }
             }
         }
 

@@ -7,6 +7,7 @@ use App\Models\Announcement;
 use App\Models\Meeting;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\MeetingPeopleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -16,10 +17,14 @@ class MeetingAdminController extends Controller
 {
     public function index(Request $request)
     {
-        $staff = $this->staff($request->user());
+        $me = $request->user();
+        MeetingPeopleService::closeMissed();
+        $staff = $this->staff($me);
         $tab = in_array($request->query('tab'), ['today', 'upcoming', 'pending', 'past'], true) ? $request->query('tab') : 'today';
 
-        $base = fn () => Meeting::whereIn('user_id', $staff->pluck('id'));
+        // Own team's meetings + meetings this manager was added to
+        $base = fn () => Meeting::where(fn ($q) => $q->whereIn('user_id', $staff->pluck('id'))
+            ->orWhereIn('id', \DB::table('meeting_participants')->where('user_id', $me->id)->select('meeting_id')));
         $scopes = [
             'today' => fn ($q) => $q->whereDate('scheduled_at', today())->orderBy('scheduled_at'),
             'upcoming' => fn ($q) => $q->whereIn('status', ['upcoming', 'live'])->where('scheduled_at', '>=', now()->subHours(2))->orderBy('scheduled_at'),
@@ -30,10 +35,13 @@ class MeetingAdminController extends Controller
         return view('meetings.manage', [
             'tab' => $tab,
             'counts' => collect($scopes)->map(fn ($s) => $s($base())->count()),
-            'meetings' => $scopes[$tab]($base())->with('user', 'creator')->paginate(20)->withQueryString(),
+            'meetings' => $scopes[$tab]($base())->with('user', 'creator', 'participants', 'lead')->paginate(20)->withQueryString(),
             'staff' => $staff,
             'platforms' => Meeting::PLATFORMS,
-            'portal' => $request->user()->role->portal(),
+            'portal' => $me->role->portal(),
+            'managers' => MeetingPeopleService::managers(),
+            'people' => app(MeetingPeopleService::class),
+            'forLead' => $request->integer('for_lead') ? \App\Models\Lead::with('assignee')->find($request->integer('for_lead')) : null,
         ]);
     }
 
@@ -51,9 +59,15 @@ class MeetingAdminController extends Controller
             'date' => ['required', 'date', 'after_or_equal:today'],
             'time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'lead_id' => ['nullable', 'integer', 'exists:leads,id'],
+            'primary_manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'managers' => ['nullable', 'array'],
+            'managers.*' => ['integer', 'exists:users,id'],
+            'notify_emails' => ['nullable', 'string', 'max:1000'],
+            'notify_numbers' => ['nullable', 'string', 'max:500'],
         ], ['user_id.in' => 'Choose an employee from the list.']);
 
-        $meeting = Meeting::create($data + [
+        $meeting = Meeting::create(collect($data)->except(['primary_manager_id', 'managers', 'notify_emails', 'notify_numbers'])->all() + [
             'created_by' => $request->user()->id,
             'scheduled_at' => Carbon::parse($data['date'].' '.$data['time']),
             'status' => 'pending',
@@ -70,7 +84,15 @@ class MeetingAdminController extends Controller
         ]);
         $audit->log('meeting.assign', "Assigned meeting \"{$meeting->title}\" to {$employee->employee_code}");
 
-        return back()->with('success', "Meeting request sent to {$employee->name}. It shows as Pending until they accept.");
+        $people = app(MeetingPeopleService::class);
+        $people->setParticipants($meeting, $data['primary_manager_id'] ?? null, $data['managers'] ?? []);
+        $sent = $people->notify($meeting->load('participants'), $request->user(),
+            \App\Http\Controllers\Employee\MeetingController::splitList($data['notify_emails'] ?? ''),
+            \App\Http\Controllers\Employee\MeetingController::splitList($data['notify_numbers'] ?? ''));
+
+        return back()->with('success', "Meeting request sent to {$employee->name}. It shows as Pending until they accept."
+            .($sent ? ' Invite sent to '.collect($sent)->where('ok', true)->count().' of '.count($sent).'.' : ''))
+            ->with('wa_links', collect($sent)->whereNotNull('link')->values()->all());
     }
 
     /** Admin / manager join a built-in meeting inside their dashboard. */

@@ -11,6 +11,11 @@
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignModal"><i class="bi bi-plus-lg me-1"></i>Give Meeting</button>
 </div>
 
+@if (session('wa_links'))
+    <div class="alert alert-warning small d-flex flex-wrap align-items-center gap-2"><i class="bi bi-whatsapp"></i> Your WhatsApp is not linked in the portal — tap to send:
+        @foreach (session('wa_links') as $w)<a href="{{ $w['link'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-success">+{{ $w['to'] }}</a>@endforeach
+    </div>
+@endif
 <nav class="seg-tabs mb-3">
     @foreach (['today' => 'Today', 'upcoming' => 'Upcoming', 'pending' => 'Pending Acceptance', 'past' => 'Past'] as $key => $label)
         <a href="{{ route($portal.'.meetings.index', ['tab' => $key]) }}" @class(['active' => $tab === $key])>{{ $label }} ({{ $counts[$key] }})</a>
@@ -20,17 +25,35 @@
 <div class="card-soft" data-live-region="status">
     <div class="table-responsive">
         <table class="table table-soft align-middle mb-0">
-            <thead><tr><th>Date & Time</th><th>Customer</th><th>Title</th><th>Employee</th><th>Platform</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Date & Time</th><th>Customer / Lead</th><th>Title</th><th>Employee</th><th>Managers</th><th>Platform</th><th>Status / Result</th><th></th></tr></thead>
             <tbody>
                 @forelse ($meetings as $m)
-                    @php [$label, $tone] = $m->badge(); @endphp
+                    @php [$label, $tone] = $m->badge(); $seeContact = $people->canSeeContact(auth()->user(), $m); $om = $m->outcomeMeta(); @endphp
                     <tr>
                         <td class="text-nowrap"><b>{{ $m->scheduled_at->format('d M Y') }}</b><div class="small text-muted">{{ $m->scheduled_at->format('h:i A') }}</div></td>
-                        <td>{{ $m->customer_name }}<div class="small-xs text-muted">{{ $m->customer_mobile }} {{ $m->city ? '· '.$m->city : '' }}</div></td>
+                        <td>
+                            {{ $m->customer_name }}
+                            <div class="small-xs text-muted">{{ $seeContact ? $m->customer_mobile : \App\Services\MeetingPeopleService::mask($m->customer_mobile) }} {{ $m->city ? '· '.$m->city : '' }}</div>
+                            @if ($m->lead)
+                                <div class="small-xs"><x-badge :tone="$m->lead->status->tone()">{{ $m->lead->status->label($m->lead->isHr()) }}</x-badge> {{ $m->lead->purpose ?? $m->lead->interest }}</div>
+                                @if ($m->lead->remarks)<div class="small-xs text-muted text-truncate" style="max-width:220px">{{ $m->lead->remarks }}</div>@endif
+                                @if ($seeContact && $m->lead->email)<div class="small-xs text-muted">{{ $m->lead->email }}</div>@endif
+                            @endif
+                            @unless ($seeContact)<div class="small-xs text-muted"><i class="bi bi-lock"></i> Mobile / e-mail: primary manager only</div>@endunless
+                        </td>
                         <td class="small">{{ $m->title }}</td>
                         <td class="small text-nowrap">{{ $m->user->name }}<div class="small-xs text-muted">{{ $m->user->employee_code }}</div></td>
+                        <td class="small">@forelse ($m->participants as $p)<div class="text-nowrap">{{ $p->name }}@if ($p->pivot->role === 'primary') <x-badge tone="primary">Primary</x-badge>@endif</div>@empty <span class="text-muted">—</span> @endforelse</td>
                         <td class="small text-nowrap"><i class="bi bi-{{ $m->platformIcon() }}"></i> {{ $m->platformLabel() }}</td>
-                        <td><x-badge :tone="$tone">{{ $label }}</x-badge>@if ($m->status === 'live' && $m->started_at)<div class="small-xs text-muted">since {{ $m->started_at->format('h:i A') }}</div>@endif</td>
+                        <td>
+                            @if ($om)
+                                <x-badge :tone="$om[1]"><i class="bi bi-{{ $om[2] }}"></i> {{ $om[0] }}</x-badge>
+                                <div class="small-xs text-muted">{{ $m->durationLabel() ? 'Duration '.$m->durationLabel() : '' }}{{ $m->outcome_note ? ' · '.$m->outcome_note : '' }}</div>
+                            @else
+                                <x-badge :tone="$tone">{{ $label }}</x-badge>@if ($m->status === 'live' && $m->started_at)<div class="small-xs text-muted">since {{ $m->started_at->format('h:i A') }}</div>@endif
+                            @endif
+                            @if ($m->notified)<div class="small-xs text-muted"><i class="bi bi-send"></i> {{ collect($m->notified)->where('ok', true)->count() }}/{{ count($m->notified) }} invites</div>@endif
+                        </td>
                         <td class="text-end text-nowrap">
                             @if (in_array($m->status, ['upcoming', 'live'], true) && ($m->isPortal() || $m->link))
                                 @if ($m->isPortal())
@@ -67,12 +90,12 @@
                     <label class="form-label required">Employee</label>
                     <select name="user_id" class="form-select" required>
                         <option value="">Choose employee…</option>
-                        @foreach ($staff as $s)<option value="{{ $s->id }}" @selected(old('user_id') == $s->id)>{{ $s->name }} ({{ $s->employee_code }})</option>@endforeach
+                        @foreach ($staff as $s)<option value="{{ $s->id }}" @selected(old('user_id', $forLead?->assigned_to) == $s->id)>{{ $s->name }} ({{ $s->employee_code }})</option>@endforeach
                     </select>
                 </div>
-                <div class="col-md-5"><label class="form-label required">Customer name</label><input name="customer_name" class="form-control" value="{{ old('customer_name') }}" required maxlength="120"></div>
-                <div class="col-md-4"><label class="form-label">Mobile</label><input name="customer_mobile" class="form-control" value="{{ old('customer_mobile') }}" maxlength="20"></div>
-                <div class="col-md-3"><label class="form-label">City</label><input name="city" class="form-control" value="{{ old('city') }}" maxlength="80"></div>
+                <div class="col-md-5"><label class="form-label required">Customer name</label><input name="customer_name" class="form-control" value="{{ old('customer_name', $forLead?->name) }}" required maxlength="120"></div>
+                <div class="col-md-4"><label class="form-label">Mobile</label><input name="customer_mobile" class="form-control" value="{{ old('customer_mobile', $forLead?->mobile) }}" maxlength="20"></div>
+                <div class="col-md-3"><label class="form-label">City</label><input name="city" class="form-control" value="{{ old('city', $forLead?->city) }}" maxlength="80"></div>
                 <div class="col-12"><label class="form-label required">Meeting title</label><input name="title" class="form-control" value="{{ old('title') }}" required maxlength="150"></div>
                 <div class="col-md-4">
                     <label class="form-label required">Platform</label>
@@ -84,6 +107,29 @@
                 <div class="col-md-4"><label class="form-label required">Time</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required></div>
                 <div class="col-12"><label class="form-label">Meeting link <span class="small text-muted fw-normal">(only for Google Meet / Zoom / Teams — Portal Meeting joins inside the dashboard)</span></label><input type="url" name="link" class="form-control" value="{{ old('link') }}" placeholder="https://meet.google.com/…"></div>
                 <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" rows="2" class="form-control" maxlength="1000">{{ old('notes') }}</textarea></div>
+                @if ($forLead)<input type="hidden" name="lead_id" value="{{ $forLead->id }}">@endif
+                <div class="col-12"><div class="meet-people">
+                    <div class="fw-bold small mb-2"><i class="bi bi-people-fill me-1"></i>Managers in this meeting</div>
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label class="form-label small">Primary manager <span class="text-muted">(sees mobile & email)</span></label>
+                            <select name="primary_manager_id" class="form-select form-select-sm">
+                                <option value="">— None —</option>
+                                @foreach ($managers as $mg)<option value="{{ $mg->id }}" @selected((int) old('primary_manager_id', auth()->user()->role->portal() === 'manager' ? auth()->id() : null) === $mg->id)>{{ $mg->name }} ({{ $mg->roleLabel() }})</option>@endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label small">Other managers</label>
+                            <div class="meet-manager-list">
+                                @foreach ($managers as $mg)<label class="small"><input type="checkbox" name="managers[]" value="{{ $mg->id }}" class="form-check-input me-1" @checked(in_array($mg->id, old('managers', [])))> {{ $mg->name }}</label>@endforeach
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-6"><label class="form-label small"><i class="bi bi-envelope"></i> Send invite to e-mails</label><textarea name="notify_emails" rows="2" class="form-control form-control-sm" placeholder="a@mail.com, b@mail.com">{{ old('notify_emails', $forLead?->email) }}</textarea></div>
+                        <div class="col-md-6"><label class="form-label small"><i class="bi bi-whatsapp"></i> WhatsApp numbers</label><textarea name="notify_numbers" rows="2" class="form-control form-control-sm" placeholder="9876543210">{{ old('notify_numbers', $forLead?->mobile) }}</textarea></div>
+                    </div>
+                </div></div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -94,5 +140,8 @@
 </div>
 @if ($errors->any() && old('customer_name'))
     @push('scripts')<script>bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal')).show();</script>@endpush
+@endif
+@if ($forLead)
+    @push('scripts')<script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal')).show());</script>@endpush
 @endif
 @endsection

@@ -61,7 +61,7 @@
             <a href="{{ route('install') }}" class="menu-link">
                 <i class="bi bi-phone"></i> Install App on Phone <i class="bi bi-chevron-right"></i>
             </a>
-            @if ($user->role->portal() === 'employee')
+            @if ($user->tracksAttendance())
                 <a href="{{ route('employee.attendance.history') }}" class="menu-link">
                     <i class="bi bi-calendar3"></i> My Attendance <i class="bi bi-chevron-right"></i>
                 </a>

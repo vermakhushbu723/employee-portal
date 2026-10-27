@@ -25,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
             $user = auth()->user();
             $activeTimer = null;
 
-            if ($user && $user->role->portal() === 'employee') {
+            if ($user && $user->tracksAttendance()) {
                 $session = app(AttendanceService::class)->todaySession($user);
                 if ($session) {
                     $activeBreak = $session->activeBreak();
@@ -80,7 +80,7 @@ class AppServiceProvider extends ServiceProvider
             $user = auth()->user();
             $gate = null;
 
-            if ($user && $user->role->portal() === 'employee') {
+            if ($user && $user->tracksAttendance()) {
                 $attendance = app(AttendanceService::class);
                 if ($attendance->mustPunchIn($user)) {
                     $gate = $attendance->checkInState($user);
@@ -89,7 +89,7 @@ class AppServiceProvider extends ServiceProvider
 
             // Employee: today's logout request (under review banner / decision popup)
             $logoutSession = null;
-            if ($user && $user->role->portal() === 'employee') {
+            if ($user && $user->tracksAttendance()) {
                 $s = app(AttendanceService::class)->todaySession($user);
                 if ($s && $s->checkout_type === 'exception' && $s->review_status
                     && ($s->logoutPending() || ! $s->decision_seen_at)) {

@@ -46,6 +46,10 @@ class EmployeeRequest extends FormRequest
             'custom_end' => ['nullable', 'required_if:shift_id,custom', 'date_format:H:i', 'different:custom_start'],
             'custom_hours' => ['nullable'],   // calculated from start / end / break (see shiftMinutes)
             'no_training' => ['nullable', 'boolean'],
+            'features_sent' => ['nullable', 'boolean'],
+            'features' => ['nullable', 'array'],
+            'features.*' => [Rule::in(array_keys(\App\Models\User::FEATURES))],
+            'target_calls' => ['nullable', 'integer', 'min:0', 'max:2000'],
             'custom_break' => ['nullable', 'integer', 'min:0', 'max:180'],
             'manager_id' => ['nullable', 'exists:users,id', Rule::notIn(array_filter([$user?->id]))],
             'designation' => ['nullable', 'string', 'max:100'],
@@ -112,7 +116,18 @@ class EmployeeRequest extends FormRequest
         return array_filter([
             'leads' => $this->validated('target_leads'),
             'interested' => $this->validated('target_interested'),
+            'calls' => $this->validated('target_calls'),
         ], fn ($v) => $v !== null && $v !== '');
+    }
+
+    /** Ticked employee sections; null when the form did not include the checkboxes (keep what is saved). */
+    public function features(): ?array
+    {
+        if (! $this->boolean('features_sent')) {
+            return $this->editing()?->features;
+        }
+
+        return array_values(array_unique((array) ($this->validated('features') ?? [])));
     }
 
     /** "No training" clears the training dates. */

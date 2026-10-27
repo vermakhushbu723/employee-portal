@@ -26,10 +26,13 @@ class LiveController extends Controller
 
         $versions = [];
 
-        if ($user->role->portal() === 'employee') {
+        if ($user->hasFeature('leads')) {
             $mine = Lead::ownedBy($user);
             $versions['leads'] = md5((clone $mine)->count().'|'.(clone $mine)->max('updated_at').'|'
                 .(clone $mine)->selectRaw('status, count(*) c')->groupBy('status')->toBase()->get()->map(fn ($r) => $r->status.$r->c)->implode(','));
+        }
+
+        if ($user->tracksAttendance()) {
 
             // Punch-in popup: changes when the window opens/closes or admin decides a late request
             $attendance = app(AttendanceService::class);

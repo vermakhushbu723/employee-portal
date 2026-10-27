@@ -29,7 +29,95 @@ class AttendanceService
 
     public function todaySession(User $user): ?AttendanceSession
     {
-        return $user->attendanceSessions()->with('breaks')->whereDate('work_date', today())->first();
+        $session = $user->attendanceSessions()->with('breaks')->whereDate('work_date', today())->first();
+
+        // Overnight shift (e.g. 09:30 PM – 01:30 AM): after midnight the shift started "yesterday"
+        if (! $session) {
+            $session = $user->attendanceSessions()->with('breaks')->whereDate('work_date', today()->subDay())
+                ->whereNull('check_out_at')->first();
+            if ($session && now()->gt($user->currentShift()->endsAt($session->work_date)->addMinutes(config('portal.work_score.max_extension_minutes', 120)))) {
+                $session = null;
+            }
+        }
+
+        if ($session) {
+            $this->autoCloseIfDue($session, $user);
+        }
+
+        return $session;
+    }
+
+    /** Actual shift end, frozen inactive-time extension and the extended end. */
+    public function shiftWindow(User $user, AttendanceSession $session): array
+    {
+        $shiftEnd = $user->currentShift()->endsAt($session->work_date);
+        $cap = config('portal.work_score.max_extension_minutes', 120) * 60;
+
+        if ($session->extension_seconds !== null) {
+            $extension = (int) $session->extension_seconds;
+        } else {
+            // Inactive time inside the shift only (idling after the shift must not keep pushing the end)
+            $until = $session->check_out_at ? $session->check_out_at->min($shiftEnd) : now()->min($shiftEnd);
+            $breaks = $session->breaks->sum(fn ($b) => max(0, $b->started_at->min($until)->diffInSeconds(($b->ended_at ?? $until)->min($until), true)));
+            $inside = max(0, $until->getTimestamp() - $session->check_in_at->getTimestamp());
+            $extension = (int) min($cap, max(0, $inside - $breaks - (int) $session->active_seconds));
+
+            // Frozen once the actual shift is over
+            if (now()->gte($shiftEnd)) {
+                $session->forceFill(['extension_seconds' => $extension])->saveQuietly();
+            }
+        }
+
+        return ['actual_end' => $shiftEnd, 'extension' => $extension, 'extended_end' => $shiftEnd->copy()->addSeconds($extension)];
+    }
+
+    /** At the extended shift end an open day is closed automatically (work done so far is scored). */
+    public function autoCloseIfDue(AttendanceSession $session, ?User $user = null): bool
+    {
+        if (! $session->isOpen()) {
+            return false;
+        }
+        $user ??= $session->user;
+        $window = $this->shiftWindow($user, $session);
+        if (now()->lt($window['extended_end'])) {
+            return false;
+        }
+
+        DB::transaction(function () use ($session, $user, $window) {
+            $at = $window['extended_end'];
+            foreach ($session->breaks->whereNull('ended_at') as $break) {
+                $break->update(['ended_at' => $at, 'duration_minutes' => intdiv(self::seconds($break->started_at, $at), 60)]);
+            }
+            $session->check_out_at = $at;
+            $timer = $this->timer($user, $session);
+            $session->fill([
+                'worked_minutes' => intdiv($timer['worked'], 60),
+                'break_minutes' => intdiv($timer['break_used'], 60),
+                'checkout_type' => 'auto',
+                'checkout_reason' => 'Automatic punch-out at shift end'.($window['extension'] ? ' (extended by '.Duration::hm($window['extension']).' inactive time)' : ''),
+            ])->save();
+
+            $this->score->finalize($session);
+            $this->audit->log('attendance.auto_checkout', "Auto punch-out of {$user->employee_code} at {$at->format('h:i A')}", ['session_id' => $session->id], $user);
+            DB::afterCommit(fn () => $this->reports->send($session->fresh(['user.employee.manager', 'breaks'])));
+        });
+
+        return true;
+    }
+
+    /** Close every open day whose extended shift is over (employees who closed the browser). */
+    public function closeDueSessions(): int
+    {
+        $n = 0;
+        AttendanceSession::with('breaks', 'user.employee.shift')->whereNull('check_out_at')
+            ->whereDate('work_date', '>=', today()->subDay())->get()
+            ->each(function (AttendanceSession $s) use (&$n) {
+                if ($s->user && $this->autoCloseIfDue($s, $s->user)) {
+                    $n++;
+                }
+            });
+
+        return $n;
     }
 
     /** True when the employee has not punched in today and is not on approved leave. */
@@ -224,7 +312,9 @@ class AttendanceService
         $session ??= $this->todaySession($user);
         $shift = $user->currentShift();
         $now = now();
-        $shiftEnd = $shift->endsAt($session?->work_date ?? today());
+        $window = $session ? $this->shiftWindow($user, $session) : null;
+        $actualEnd = $window['actual_end'] ?? $shift->endsAt(today());
+        $shiftEnd = $window['extended_end'] ?? $actualEnd;   // inactive time extends the shift
         $required = $shift->required_minutes * 60;
         $breakAllowed = $shift->break_allowed_minutes * 60;
 
@@ -262,6 +352,8 @@ class AttendanceService
             'is_late' => (bool) $session?->is_late,
             'shift_label' => $shift->label(),
             'shift_end_at' => $shiftEnd->format('h:i A'),
+            'actual_end_at' => $actualEnd->format('h:i A'),
+            'extension' => $window['extension'] ?? 0,
             'shift_ends_in' => max(0, $shiftEnd->getTimestamp() - $now->getTimestamp()),
             'shift_over' => $now->gte($shiftEnd),
             'required' => $required,

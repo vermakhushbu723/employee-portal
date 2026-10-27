@@ -48,6 +48,7 @@
                     <video data-local autoplay playsinline muted></video>
                     <div class="meet-avatar d-none" data-local-off>{{ strtoupper(substr(auth()->user()?->name ?? 'You', 0, 1)) }}</div>
                     <span class="meet-name">You <i class="bi bi-mic-mute-fill d-none" data-local-muted></i></span>
+                    <button type="button" class="meet-fs" data-tile-fs title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>
                 </div>
             </div>
             <aside class="meet-side d-none" data-side>
@@ -87,12 +88,35 @@
                 <button type="button" class="ctrl" data-copy="{{ $api['invite'] }}"><i class="bi bi-link-45deg"></i><span>Invite Link</span></button>
                 @if ($wa)<a class="ctrl" href="{{ $wa }}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i><span>Invite</span></a>@endif
             @endif
+            <button type="button" class="ctrl" data-fullscreen><i class="bi bi-arrows-fullscreen"></i><span>Full Screen</span></button>
             <button type="button" class="ctrl end" data-leave><i class="bi bi-telephone-x-fill"></i><span>Leave</span></button>
             @isset($endForm)
-                <form method="POST" action="{{ $endForm }}" class="d-inline" data-confirm="End the meeting for everyone?" data-end-form>@csrf<button class="ctrl end"><i class="bi bi-x-octagon-fill"></i><span>End Meeting</span></button></form>
+                <button type="button" class="ctrl end" data-bs-toggle="modal" data-bs-target="#endMeetingModal"><i class="bi bi-x-octagon-fill"></i><span>End Meeting</span></button>
             @endisset
         </div>
     </div>
+
+    @isset($endForm)
+        <div class="modal fade" id="endMeetingModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <form method="POST" action="{{ $endForm }}" class="modal-content rounded-4 border-0 text-dark" data-end-form>
+                    @csrf
+                    <div class="modal-header border-0"><h5 class="modal-title fw-bold">End meeting — how did it go?</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body pt-0">
+                        <div class="outcome-pick">
+                            @foreach (\App\Services\MeetingPeopleService::OUTCOMES as $key => [$olabel, $otone, $oicon])
+                                <label class="outcome-opt tone-{{ $otone }}"><input type="radio" name="outcome" value="{{ $key }}" @checked($key === 'success')><span><i class="bi bi-{{ $oicon }}"></i> {{ $olabel }}</span></label>
+                            @endforeach
+                        </div>
+                        <label class="form-label small mt-3">Note (optional)</label>
+                        <input type="text" name="outcome_note" maxlength="500" class="form-control" placeholder="e.g. Customer agreed to apply">
+                        <div class="small-xs text-muted mt-2">Duration is saved automatically from when the meeting started.</div>
+                    </div>
+                    <div class="modal-footer border-0"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger">End for everyone</button></div>
+                </form>
+            </div>
+        </div>
+    @endisset
 
     {{-- After leaving --}}
     <div class="meet-left d-none text-center" data-left>

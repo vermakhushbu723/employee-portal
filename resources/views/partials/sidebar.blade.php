@@ -19,6 +19,7 @@
 
         <nav class="nav flex-column sidebar-nav">
             @foreach ($menu as $item)
+                @continue(isset($item['feature']) && ! auth()->user()->hasFeature($item['feature']))
                 @isset($item['heading'])
                     <div class="sidebar-heading">{{ $item['heading'] }}</div>
                 @elseif (($item['children'] ?? null) === 'departments')

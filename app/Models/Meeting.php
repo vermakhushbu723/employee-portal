@@ -27,6 +27,7 @@ class Meeting extends Model
     protected $fillable = [
         'user_id', 'created_by', 'lead_id', 'customer_name', 'customer_mobile', 'city', 'title',
         'platform', 'link', 'scheduled_at', 'notes', 'status', 'started_at', 'ended_at', 'room_token',
+        'outcome', 'outcome_note', 'duration_seconds', 'notified',
     ];
 
     protected static function booted(): void
@@ -53,7 +54,7 @@ class Meeting extends Model
 
     protected function casts(): array
     {
-        return ['scheduled_at' => 'datetime', 'started_at' => 'datetime', 'ended_at' => 'datetime'];
+        return ['scheduled_at' => 'datetime', 'started_at' => 'datetime', 'ended_at' => 'datetime', 'notified' => 'array'];
     }
 
     public function user(): BelongsTo
@@ -64,6 +65,31 @@ class Meeting extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Primary manager + other managers added to this meeting. */
+    public function participants(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'meeting_participants')->withPivot('role')->withTimestamps();
+    }
+
+    public function primaryManager(): ?User
+    {
+        return $this->participants->first(fn ($p) => $p->pivot->role === 'primary');
+    }
+
+    /** [label, tone, icon] of the outcome, or null while not finished. */
+    public function outcomeMeta(): ?array
+    {
+        return $this->outcome ? (\App\Services\MeetingPeopleService::OUTCOMES[$this->outcome] ?? null) : null;
+    }
+
+    /** How long the meeting ran (connected time). */
+    public function durationLabel(): ?string
+    {
+        $s = $this->duration_seconds ?? ($this->started_at && $this->ended_at ? $this->started_at->diffInSeconds($this->ended_at, true) : null);
+
+        return $s === null ? null : \App\Support\Duration::hm((int) $s);
     }
 
     public function lead(): BelongsTo

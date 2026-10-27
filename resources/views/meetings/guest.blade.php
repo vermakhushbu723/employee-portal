@@ -13,13 +13,6 @@
     <link href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}" rel="stylesheet">
 </head>
 <body class="meet-guest-body">
-    <header class="meet-guest-head">
-        <img src="{{ asset('icons/icon-192.png') }}" alt="" width="34" height="34">
-        <div>
-            <b>{{ config('portal.company') }}</b>
-            <div class="small opacity-75">Video meeting{{ $m->user ? ' with '.$m->user->name : '' }}</div>
-        </div>
-    </header>
     <main class="meet-guest-main">
         @if (in_array($m->status, ['completed', 'cancelled', 'declined'], true))
             <div class="meet-left text-center">

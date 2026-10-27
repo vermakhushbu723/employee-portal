@@ -16,6 +16,7 @@ class LeadService
         return DB::transaction(function () use ($user, $data) {
             $lead = Lead::create([
                 ...$data,
+                'department_id' => $data['department_id'] ?? $user->employee?->department_id,
                 'created_by' => $user->id,
                 'assigned_to' => $user->id,
                 'status' => empty($data['follow_up_date']) ? LeadStatus::New : LeadStatus::FollowUp,
@@ -40,7 +41,9 @@ class LeadService
 
         $lead->update([
             'status' => $status,
-            'follow_up_date' => $status === LeadStatus::FollowUp ? $followUpDate : $lead->follow_up_date,
+            'follow_up_date' => in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true) && $followUpDate ? $followUpDate : $lead->follow_up_date,
+            'next_action_at' => in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true) && $followUpDate ? $followUpDate.' 10:00:00' : $lead->next_action_at,
+            'next_action_type' => in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true) && $followUpDate ? 'call' : $lead->next_action_type,
             'converted_at' => $status === LeadStatus::Converted ? ($lead->converted_at ?? now()) : null,
         ]);
 

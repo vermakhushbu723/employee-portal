@@ -166,6 +166,31 @@
                     </div>
                 </div>
             @endif
+            <div class="col-md-6">
+                <label class="form-label">Daily Calls Target</label>
+                <input type="number" name="target_calls" min="0" max="2000" value="{{ old('target_calls', $user ? ($user->targets()->where('period', 'daily')->where('metric', 'calls')->value('target_value') ?? config('portal.work_score.default_calls_target')) : config('portal.work_score.default_calls_target')) }}" class="form-control">
+            </div>
+
+            {{-- Employee sections for this ID (managers / team leaders get only the ticked ones) --}}
+            @php
+                $featureList = \App\Models\User::FEATURES;
+                $featureDefault = $user ? collect($featureList)->keys()->filter(fn ($f) => $user->hasFeature($f))->values()->all() : array_keys($featureList);
+                $featureValues = old('features_sent') ? (array) old('features', []) : $featureDefault;
+            @endphp
+            <div class="col-12">
+                <label class="form-label mb-1">Employee sections for this ID</label>
+                <div class="small text-muted mb-2">Employees normally have all of them. Tick what a <b>Manager / Team Leader</b> should also get — e.g. punch in / out with login, active and inactive time.</div>
+                <input type="hidden" name="features_sent" value="1">
+                <div class="feature-checks">
+                    @foreach ($featureList as $key => [$flabel, $ficon, $fhint])
+                        <label class="feature-check">
+                            <input type="checkbox" name="features[]" value="{{ $key }}" class="form-check-input m-0" @checked(in_array($key, $featureValues, true))>
+                            <i class="bi bi-{{ $ficon }}"></i>
+                            <span><b>{{ $flabel }}</b><small>{{ $fhint }}</small></span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
         </div>
     </div>
 </div>

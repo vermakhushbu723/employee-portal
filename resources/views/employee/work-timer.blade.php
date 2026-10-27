@@ -13,11 +13,15 @@
             @if ($timer['shift_over'])
                 <div class="text-muted small fw-600">Shift Time</div>
                 <div class="countdown my-1 text-danger"><i class="bi bi-clock-history me-2 fs-3"></i>Shift Over</div>
-                <div class="text-muted small">Shift ended at {{ $timer['shift_end_at'] }} — complete your work to punch out</div>
+                <div class="text-muted small">Shift ended at {{ $timer['shift_end_at'] }} — you are punched out automatically; work done so far is counted</div>
             @else
                 <div class="text-muted small fw-600">Shift Ends In</div>
                 <div class="countdown my-1"><i class="bi bi-clock me-2 fs-3"></i><span data-bind="shift_ends_in:hms">{{ Duration::hms($timer['shift_ends_in']) }}</span></div>
                 <div class="text-muted small">(Till {{ $timer['shift_end_at'] }})</div>
+                @if ($timer['extension'])
+                    <div class="small mt-1 text-danger"><i class="bi bi-hourglass-split"></i> Shift {{ $timer['actual_end_at'] }} + {{ Duration::hm($timer['extension']) }} inactive time</div>
+                @endif
+                <div class="small-xs text-muted mt-1">Inactive time extends your shift (up to {{ intdiv(config('portal.work_score.max_extension_minutes', 120), 60) }}h). At the end you are punched out automatically and the work done till then is counted.</div>
             @endif
         </div>
 

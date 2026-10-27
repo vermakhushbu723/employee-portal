@@ -28,7 +28,8 @@ class MeetingRoomService
         return $m->user_id === $user->id
             || $m->created_by === $user->id
             || $user->role->portal() === 'admin'
-            || $m->user?->employee?->manager_id === $user->id;
+            || $m->user?->employee?->manager_id === $user->id
+            || $m->participants()->whereKey($user->id)->exists();   // managers added to the meeting
     }
 
     public function join(Meeting $m, ?User $user, string $name): array

@@ -14,7 +14,7 @@ class AttendanceSession extends Model
         'worked_minutes', 'break_minutes', 'checkout_type', 'checkout_reason',
         'review_status', 'reviewed_by', 'ip_address', 'active_seconds', 'last_heartbeat_at',
         'leads_created', 'interested_count', 'target_leads', 'target_interested', 'work_score', 'grade', 'corrected_by', 'correction_note', 'report_sent_at', 'calls_made', 'corrected_at',
-        'logout_requested_at', 'logout_verified_by', 'logout_verified_at', 'logout_note', 'reviewed_at', 'decision_seen_at',
+        'logout_requested_at', 'logout_verified_by', 'logout_verified_at', 'logout_note', 'reviewed_at', 'decision_seen_at', 'extension_seconds',
     ];
 
     protected function casts(): array
@@ -32,6 +32,7 @@ class AttendanceSession extends Model
             'report_sent_at' => 'datetime',
             'work_score' => 'integer',
             'active_seconds' => 'integer',
+            'extension_seconds' => 'integer',
             'is_late' => 'boolean',
             'status' => AttendanceStatus::class,
         ];

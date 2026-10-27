@@ -24,7 +24,7 @@
 
         <div class="app-main">
             @include('partials.topbar')
-            @if (auth()->user()->role->portal() === 'employee')
+            @if (auth()->user()->tracksAttendance())
                 @include('partials.employee-status-bar')
             @endif
 
@@ -45,7 +45,7 @@
     @include('partials.whatsapp-panel')
     @include('partials.install-banner')
     @include('partials.punch-gate')
-    @if (auth()->user()->role->portal() === 'employee')
+    @if (auth()->user()->tracksAttendance())
         @include('partials.logout-status')
     @endif
 

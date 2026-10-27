@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\LeadStatus;
 use App\Models\AttendanceSession;
 use App\Models\Lead;
 use App\Models\LeadActivity;
@@ -63,9 +64,30 @@ class WorkScoreService
     {
         return LeadActivity::where('user_id', $user->id)
             ->whereDate('created_at', $date)
-            ->whereIn('to_status', ['interested', 'converted'])
+            ->whereIn('to_status', LeadStatus::positive())
+            // A lead the manager / admin reviewed and moved away from Interested / Converted no longer counts
+            ->whereNotIn('lead_id', Lead::whereNotNull('corrected_at')->whereNotIn('status', LeadStatus::positive())->select('id'))
             ->distinct()
             ->count('lead_id');
+    }
+
+    /** Re-score a closed day from its stored numbers (after a correction). */
+    public function rescoreStored(AttendanceSession $session): AttendanceSession
+    {
+        $user = $session->user;
+        $required = max(1, $user->currentShift()->required_minutes * 60);
+        $tl = (int) ($session->target_leads ?? $this->targets($user)['leads']);
+        $ti = (int) ($session->target_interested ?? $this->targets($user)['interested']);
+        $parts = [
+            min(1, (int) $session->active_seconds / $required),
+            $tl > 0 ? min(1, (int) $session->leads_created / $tl) : 1,
+            $ti > 0 ? min(1, (int) $session->interested_count / $ti) : 1,
+        ];
+        $score = (int) floor(array_sum($parts) / 3 * 100);
+        $grade = self::gradeFor($score);
+        $session->forceFill(['work_score' => $score, 'grade' => $grade, 'status' => self::statusForGrade($grade, (bool) $session->is_late)])->save();
+
+        return $session;
     }
 
     /** Full breakdown for a session (live for today, stored numbers once finalized). */

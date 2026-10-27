@@ -3,6 +3,13 @@
 @section('title', 'Meetings')
 
 @section('content')
+@if (session('wa_links'))
+    <div class="alert alert-warning small d-flex flex-wrap align-items-center gap-2">
+        <i class="bi bi-whatsapp"></i> WhatsApp is not linked in the portal, so tap to send these invites from your phone:
+        @foreach (session('wa_links') as $w)<a href="{{ $w['link'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-success">+{{ $w['to'] }}</a>@endforeach
+    </div>
+@endif
+
 @if ($live)
     <a href="{{ route('employee.meetings.room', $live) }}" class="status-banner tone-success mb-3 text-decoration-none">
         <span class="dot"><i class="bi bi-camera-video-fill small"></i></span>
@@ -42,8 +49,14 @@
                 <div class="small text-muted text-truncate">{{ $m->title }} · <i class="bi bi-{{ $m->platformIcon() }}"></i> {{ $m->platformLabel() }}@if ($m->customer_mobile) · {{ $m->customer_mobile }}@endif</div>
                 @if ($m->creator && $m->creator->id !== $m->user_id)<div class="small-xs text-muted">Given by {{ $m->creator->name }}</div>@endif
                 @if ($m->notes)<div class="small-xs text-muted text-truncate">{{ $m->notes }}</div>@endif
+                @if ($m->participants->isNotEmpty())<div class="small-xs text-muted"><i class="bi bi-people"></i> {{ $m->participants->map(fn ($p) => $p->name.($p->pivot->role === 'primary' ? ' (primary)' : ''))->implode(', ') }}</div>@endif
+                @if ($m->notified)<div class="small-xs text-muted"><i class="bi bi-send"></i> Invite: {{ collect($m->notified)->where('ok', true)->count() }} sent of {{ count($m->notified) }}</div>@endif
             </div>
-            <x-badge :tone="$tone">{{ $label }}</x-badge>
+            @if ($om = $m->outcomeMeta())
+                <span class="text-end"><x-badge :tone="$om[1]"><i class="bi bi-{{ $om[2] }}"></i> {{ $om[0] }}</x-badge>@if ($m->durationLabel())<div class="small-xs text-muted">{{ $m->durationLabel() }}</div>@endif</span>
+            @else
+                <x-badge :tone="$tone">{{ $label }}</x-badge>
+            @endif
             <div class="meeting-actions">
                 @if ($m->status === 'pending')
                     <form method="POST" action="{{ route('employee.meetings.accept', $m) }}" class="d-inline">@csrf<button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> Accept</button></form>
@@ -107,10 +120,38 @@
                 </div>
                 <div class="col-md-5 d-none" data-portal-note><div class="info-box h-100"><i class="bi bi-camera-video-fill"></i><div>Joins <b>inside the dashboard</b>. The customer gets a join link (send it on WhatsApp from the list) — no app or login needed.</div></div></div>
                 <div class="col-12"><label class="form-label">Notes (optional)</label><textarea name="notes" rows="2" class="form-control" maxlength="1000">{{ old('notes') }}</textarea></div>
+
+                {{-- Who joins + who gets the invite --}}
+                <div class="col-12"><div class="meet-people">
+                    <div class="fw-bold small mb-2"><i class="bi bi-people-fill me-1"></i>Managers in this meeting</div>
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <label class="form-label small">Primary manager <span class="text-muted">(sees customer mobile & email)</span></label>
+                            <select name="primary_manager_id" class="form-select form-select-sm" data-primary-manager>
+                                <option value="">— None —</option>
+                                @foreach ($managers as $mg)<option value="{{ $mg->id }}" data-email="{{ $mg->email }}" data-mobile="{{ $mg->mobile }}" @selected((int) old('primary_manager_id', $myManagerId) === $mg->id)>{{ $mg->name }} ({{ $mg->roleLabel() }})</option>@endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label small">Other managers <span class="text-muted">(see lead details, not mobile / email)</span></label>
+                            <div class="meet-manager-list">
+                                @foreach ($managers as $mg)
+                                    <label class="small"><input type="checkbox" name="managers[]" value="{{ $mg->id }}" class="form-check-input me-1" data-email="{{ $mg->email }}" data-mobile="{{ $mg->mobile }}" @checked(in_array($mg->id, old('managers', [])))> {{ $mg->name }}</label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    <div class="fw-bold small mt-3 mb-2"><i class="bi bi-send-fill me-1"></i>Send the invite (with the meeting link)</div>
+                    <div class="row g-2">
+                        <div class="col-md-6"><label class="form-label small"><i class="bi bi-envelope"></i> E-mails</label><textarea name="notify_emails" rows="2" class="form-control form-control-sm" placeholder="customer@mail.com, manager@mail.com" data-notify-emails>{{ old('notify_emails') }}</textarea></div>
+                        <div class="col-md-6"><label class="form-label small"><i class="bi bi-whatsapp"></i> WhatsApp numbers</label><textarea name="notify_numbers" rows="2" class="form-control form-control-sm" placeholder="9876543210, 9123456780" data-notify-numbers>{{ old('notify_numbers') }}</textarea></div>
+                    </div>
+                    <div class="small-xs text-muted mt-1">Sent when you book: e-mail from the portal, WhatsApp from your linked WhatsApp (if not linked, you get one-tap WhatsApp links).</div>
+                </div></div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button class="btn btn-primary"><i class="bi bi-calendar-plus me-1"></i>Book Meeting</button>
+                <button class="btn btn-primary"><i class="bi bi-send-check me-1"></i>Book & Send Invite</button>
             </div>
         </form>
     </div>
@@ -141,8 +182,31 @@
 @endsection
 
 @push('scripts')
+@php $leadContacts = $leads->mapWithKeys(fn ($l) => [$l->id => ['m' => $l->mobile, 'e' => $l->email]]); @endphp
 <script>
 (() => {
+    const emails = document.querySelector('[data-notify-emails]');
+    const numbers = document.querySelector('[data-notify-numbers]');
+    const addTo = (box, value) => {
+        if (!value) return;
+        const list = box.value.split(/[\s,;]+/).filter(Boolean);
+        if (!list.includes(value)) { list.push(value); box.value = list.join(', '); }
+    };
+    const leadContacts = {!! json_encode($leadContacts, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+    document.querySelector('[data-meeting-lead]')?.addEventListener('change', (e) => {
+        const c = leadContacts[e.target.value];
+        if (c) { addTo(numbers, (c.m || '').replace(/\D/g, '')); addTo(emails, c.e); }
+    });
+    document.querySelector('[name=customer_mobile]')?.addEventListener('change', (e) => addTo(numbers, e.target.value.replace(/\D/g, '')));
+    document.querySelectorAll('[name="managers[]"]').forEach((cb) => cb.addEventListener('change', () => { if (cb.checked) addTo(emails, cb.dataset.email); }));
+    document.querySelector('[data-primary-manager]')?.addEventListener('change', (e) => addTo(emails, e.target.selectedOptions[0]?.dataset.email));
+    @if ($forLead)
+        document.addEventListener('DOMContentLoaded', () => {
+            const sel = document.querySelector('[data-meeting-lead]');
+            sel.value = '{{ $forLead->id }}'; sel.dispatchEvent(new Event('change'));
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('bookModal')).show();
+        });
+    @endif
     const lead = document.querySelector('[data-meeting-lead]');
     const sync = () => document.querySelectorAll('[data-manual-customer]').forEach((el) => el.classList.toggle('d-none', !!lead.value));
     lead?.addEventListener('change', sync);

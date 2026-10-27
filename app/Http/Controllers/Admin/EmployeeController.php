@@ -50,6 +50,7 @@ class EmployeeController extends Controller
                 'role' => $request->resolvedRole()[0],
                 'custom_role_id' => $request->resolvedRole()[1],
                 'password' => $data['password'],
+                'features' => $request->features(),
             ]);
 
             $user->employee()->create($request->profileData());
@@ -86,6 +87,7 @@ class EmployeeController extends Controller
                 'mobile' => $data['mobile'] ?? null,
                 'role' => $request->resolvedRole()[0],
                 'custom_role_id' => $request->resolvedRole()[1],
+                'features' => $request->features(),
             ]);
 
             if (! empty($data['password'])) {

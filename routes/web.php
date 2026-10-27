@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DailyWorkReportController;
 use App\Http\Controllers\Employee;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LeadReviewController;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\LogoutRequestController;
 use App\Http\Controllers\Manager;
@@ -53,6 +54,9 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
+    // Voice note / e-mail file of a lead (the employee, or admin / their manager)
+    Route::get('lead-files/{comm}', [Employee\LeadCommunicationController::class, 'file'])->whereNumber('comm')->name('lead-files.show');
+
     // WhatsApp inside the portal (each user's own linked WhatsApp)
     Route::controller(WhatsAppController::class)->prefix('wa')->name('wa.')->group(function () {
         Route::post('start', 'start')->name('start');
@@ -83,6 +87,25 @@ Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
     ->group(function () {
         Route::get('dashboard', Employee\DashboardController::class)->name('dashboard');
 
+        // My assigned work + task details
+        Route::controller(Employee\TaskController::class)->prefix('tasks')->name('tasks.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('{assignment}', 'show')->whereNumber('assignment')->name('show');
+            Route::post('{assignment}/start', 'start')->whereNumber('assignment')->name('start');
+            Route::post('{assignment}/progress', 'progress')->whereNumber('assignment')->name('progress');
+            Route::post('{assignment}/submit', 'submit')->whereNumber('assignment')->name('submit');
+        });
+
+        // Leave history, apply leave, leave charges
+        Route::get('leave-history', [Employee\LeaveController::class, 'index'])->name('leaves.index');
+        Route::post('leaves', [Employee\LeaveController::class, 'store'])->name('leaves.store');
+        Route::get('leave-charges', [Employee\LeaveController::class, 'charges'])->name('leaves.charges');
+
+        Route::get('performance', Employee\PerformanceController::class)->name('performance');
+    });
+
+// Employee sections that admin can also give a manager / team leader (users.features)
+Route::middleware(['auth', 'feature:attendance'])->prefix('employee')->name('employee.')->group(function () {
         // Active-time heartbeat (navbar timer)
         Route::post('activity/heartbeat', Employee\ActivityController::class)->name('activity.heartbeat');
 
@@ -108,15 +131,9 @@ Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
             Route::post('end', 'end')->name('end');
         });
 
-        // My assigned work + task details
-        Route::controller(Employee\TaskController::class)->prefix('tasks')->name('tasks.')->group(function () {
-            Route::get('/', 'index')->name('index');
-            Route::get('{assignment}', 'show')->whereNumber('assignment')->name('show');
-            Route::post('{assignment}/start', 'start')->whereNumber('assignment')->name('start');
-            Route::post('{assignment}/progress', 'progress')->whereNumber('assignment')->name('progress');
-            Route::post('{assignment}/submit', 'submit')->whereNumber('assignment')->name('submit');
-        });
+});
 
+Route::middleware(['auth', 'feature:leads', 'punched-in'])->prefix('employee')->name('employee.')->group(function () {
         // Leads
         Route::controller(Employee\LeadController::class)->prefix('leads')->name('leads.')->group(function () {
             Route::get('/', 'index')->name('index');
@@ -126,13 +143,21 @@ Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
             Route::patch('{lead}/status', 'updateStatus')->whereNumber('lead')->name('status');
         });
 
-        // Leave history, apply leave, leave charges
-        Route::get('leave-history', [Employee\LeaveController::class, 'index'])->name('leaves.index');
-        Route::post('leaves', [Employee\LeaveController::class, 'store'])->name('leaves.store');
-        Route::get('leave-charges', [Employee\LeaveController::class, 'charges'])->name('leaves.charges');
+        // Calls (talk time), WhatsApp, e-mail, voice notes, inline purpose / remark, details panel
+        Route::controller(Employee\LeadCommunicationController::class)->prefix('leads/{lead}')->whereNumber('lead')->name('leads.')->group(function () {
+            Route::get('panel', 'panel')->name('panel');
+            Route::get('templates', 'templates')->name('templates');
+            Route::patch('inline', 'inline')->name('inline');
+            Route::post('call', 'startCall')->name('call.start');
+            Route::post('call/{call}', 'endCall')->whereNumber('call')->name('call.end');
+            Route::post('whatsapp', 'whatsapp')->middleware('throttle:30,1')->name('whatsapp');
+            Route::post('email', 'email')->middleware('throttle:20,1')->name('email');
+            Route::post('voice-note', 'voiceNote')->name('voice-note');
+        });
 
-        Route::get('performance', Employee\PerformanceController::class)->name('performance');
+});
 
+Route::middleware(['auth', 'feature:meetings', 'punched-in'])->prefix('employee')->name('employee.')->group(function () {
         // Customer meetings: book, accept / decline, join (In Meeting), end
         Route::controller(Employee\MeetingController::class)->prefix('meetings')->name('meetings.')->group(function () {
             Route::get('/', 'index')->name('index');
@@ -144,7 +169,7 @@ Route::middleware(['auth', 'role:employee,team_leader', 'punched-in'])
             Route::get('{meeting}/room', 'room')->whereNumber('meeting')->name('room');
             Route::post('{meeting}/end', 'end')->whereNumber('meeting')->name('end');
         });
-    });
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -165,6 +190,8 @@ Route::middleware(['auth', 'role:manager,team_leader'])
         Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
         Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
         Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
+        Route::get('review', [LeadReviewController::class, 'index'])->name('review.index');
+        Route::patch('review/leads/{lead}', [LeadReviewController::class, 'update'])->whereNumber('lead')->name('review.update');
         Route::post('logout-requests/{session}/approve', [LogoutRequestController::class, 'approve'])->whereNumber('session')->name('logout-requests.approve');
         Route::post('logout-requests/{session}/reject', [LogoutRequestController::class, 'reject'])->whereNumber('session')->name('logout-requests.reject');
         Route::controller(WorkCorrectionController::class)->prefix('corrections')->name('corrections.')->group(function () {
@@ -210,6 +237,8 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
         Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
         Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
+        Route::get('review', [LeadReviewController::class, 'index'])->name('review.index');
+        Route::patch('review/leads/{lead}', [LeadReviewController::class, 'update'])->whereNumber('lead')->name('review.update');
         Route::post('logout-requests/{session}/approve', [LogoutRequestController::class, 'approve'])->whereNumber('session')->name('logout-requests.approve');
         Route::post('logout-requests/{session}/reject', [LogoutRequestController::class, 'reject'])->whereNumber('session')->name('logout-requests.reject');
         Route::controller(WorkCorrectionController::class)->prefix('corrections')->name('corrections.')->group(function () {

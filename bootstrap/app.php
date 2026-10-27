@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
             'punched-in' => EnsurePunchedIn::class,
+            'feature' => \App\Http\Middleware\EnsureFeature::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
