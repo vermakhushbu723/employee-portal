@@ -17,6 +17,7 @@
                 <th class="text-center">Meetings</th>
                 <th style="min-width:120px">Progress</th>
                 <th>Battery</th>
+                <th>Network</th>
                 <th>Location</th>
                 <th>Last Active</th>
                 <th></th>
@@ -63,6 +64,14 @@
                         @endif
                     </td>
                     <td class="small text-nowrap">
+                        @if ($net = LiveStatusService::network($u))
+                            <span class="net-bars text-{{ $net[1] }}" title="{{ $net[3] }}">@for ($b = 1; $b <= 4; $b++)<i @class(['on' => $b <= $net[0]])></i>@endfor</span>
+                            {{ $net[2] }}<div class="small-xs text-muted">{{ $net[3] }}</div>
+                        @else
+                            <span class="text-muted">—</span>
+                        @endif
+                    </td>
+                    <td class="small text-nowrap">
                         @if ($u->latitude && $u->location_at?->isToday())
                             <a href="https://www.google.com/maps?q={{ $u->latitude }},{{ $u->longitude }}" target="_blank" rel="noopener" class="{{ $fresh ? '' : 'text-muted' }}" title="Updated {{ $u->location_at->diffForHumans() }} · ±{{ $u->location_accuracy }} m">
                                 <i class="bi bi-geo-alt-fill"></i> Map
@@ -93,9 +102,9 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="14"><x-empty-state icon="people" title="No employees found" /></td></tr>
+                <tr><td colspan="15"><x-empty-state icon="people" title="No employees found" /></td></tr>
             @endforelse
-            <tr class="live-no-match d-none"><td colspan="14" class="text-center text-muted small py-4">No employee matches this filter.</td></tr>
+            <tr class="live-no-match d-none"><td colspan="15" class="text-center text-muted small py-4">No employee matches this filter.</td></tr>
         </tbody>
     </table>
 </div>

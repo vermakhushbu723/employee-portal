@@ -171,6 +171,16 @@
                 <input type="number" name="target_calls" min="0" max="2000" value="{{ old('target_calls', $user ? ($user->targets()->where('period', 'daily')->where('metric', 'calls')->value('target_value') ?? config('portal.work_score.default_calls_target')) : config('portal.work_score.default_calls_target')) }}" class="form-control">
             </div>
 
+            {{-- Location: mandatory = the portal / app does not open (and login is refused) without location --}}
+            <div class="col-12">
+                <label class="form-label mb-1">Location</label>
+                <div class="seg-choice">
+                    <label><input type="radio" name="location_required" value="0" @checked(! old('location_required', $user?->location_required ? '1' : '0'))><span><i class="bi bi-geo"></i> Optional</span></label>
+                    <label><input type="radio" name="location_required" value="1" @checked(old('location_required', $user?->location_required ? '1' : '0') === '1')><span><i class="bi bi-geo-alt-fill"></i> Mandatory</span></label>
+                </div>
+                <div class="small text-muted mt-1"><b>Mandatory:</b> login is refused and the system / mobile app does not open until location access is allowed. <b>Optional:</b> a reminder only.</div>
+            </div>
+
             {{-- Employee sections for this ID (managers / team leaders get only the ticked ones) --}}
             @php
                 $featureList = \App\Models\User::FEATURES;

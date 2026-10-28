@@ -36,7 +36,7 @@
         <div class="card-soft card-pad mb-3">
             <div class="kv-row"><span class="k"><i class="bi bi-flag"></i>Priority</span>
                 <span class="v {{ $task->priority === 'high' ? 'text-danger' : '' }}"><i class="bi bi-flag-fill me-1"></i>{{ ucfirst($task->priority) }}</span></div>
-            <div class="kv-row"><span class="k"><i class="bi bi-person"></i>Assigned By</span><span class="v">{{ $task->assigner?->name ?? 'Admin' }}</span></div>
+            <div class="kv-row"><span class="k"><i class="bi bi-person"></i>Assigned By</span><span class="v">{{ $task->assigner?->publicName() ?? \App\Models\User::MANAGEMENT }}</span></div>
             <div class="kv-row"><span class="k"><i class="bi bi-calendar"></i>Assigned On</span><span class="v">{{ $assignment->created_at->format('d M Y, h:i A') }}</span></div>
             <div class="kv-row"><span class="k"><i class="bi bi-stack"></i>Task Type</span><span class="v text-primary">{{ $meta['label'] }}</span></div>
             @if ($task->related_list)

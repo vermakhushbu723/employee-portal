@@ -21,11 +21,15 @@ class ActivityController extends Controller
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'accuracy' => ['nullable', 'numeric', 'min:0'],
             'geo' => ['nullable', 'in:ok,denied,unsupported'],
+            'net' => ['nullable', 'string', 'max:20', 'regex:/^[a-z0-9-]+$/'],
+            'mbps' => ['nullable', 'numeric', 'min:0', 'max:10000'],
+            'rtt' => ['nullable', 'integer', 'min:0', 'max:600000'],
         ]);
 
         // Time in a live customer meeting counts as work even though the meeting window is in front (max 3 h)
-        $inMeeting = Meeting::where('user_id', $request->user()->id)->where('status', 'live')
-            ->where('started_at', '>=', now()->subHours(3))->exists();
+        $inMeeting = \App\Services\MeetingRoomService::inRoomUserIds([$request->user()->id]) !== []
+            || Meeting::where('user_id', $request->user()->id)->where('status', 'live')->where('platform', '!=', 'portal')
+                ->where('started_at', '>=', now()->subHours(3))->exists();
         $active = $request->boolean('active') || $inMeeting;
 
         // A background tab beats less often (about once a minute), so allow a longer gap during a meeting

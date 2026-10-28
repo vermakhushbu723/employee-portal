@@ -50,6 +50,15 @@ class WhatsAppController extends Controller
         return $this->proxy(fn () => $this->started($request, fn ($sid) => $this->wa->call('POST', "/s/{$sid}/send", $data)));
     }
 
+    /** Link with phone number: returns the 8-letter code the user types in WhatsApp (no QR scan). */
+    public function pair(Request $request)
+    {
+        $number = preg_replace('/\D/', '', $request->validate(['number' => ['required', 'string', 'max:20']])['number']);
+        abort_unless(strlen($number) >= 10 && strlen($number) <= 15, 422, 'Enter your WhatsApp number.');
+
+        return $this->proxy(fn () => $this->wa->call('POST', '/s/'.$this->wa->sid($request->user()).'/pair', ['number' => $number]));
+    }
+
     public function logout(Request $request)
     {
         return $this->proxy(fn () => $this->started($request, fn ($sid) => $this->wa->call('POST', "/s/{$sid}/logout")));

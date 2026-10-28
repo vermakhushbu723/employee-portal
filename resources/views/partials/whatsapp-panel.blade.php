@@ -4,7 +4,7 @@
     Served by the WhatsApp gateway on the server (App\Services\WhatsAppGateway).
 --}}
 @php
-    $waUrls = collect(['start', 'status', 'chats', 'messages', 'send', 'logout'])->mapWithKeys(fn ($a) => [$a => route('wa.'.$a)]);
+    $waUrls = collect(['start', 'status', 'chats', 'messages', 'send', 'logout', 'pair'])->mapWithKeys(fn ($a) => [$a => route('wa.'.$a)]);
 @endphp
 <aside class="wa-side d-none" id="waPanel" aria-label="WhatsApp" data-urls='@json($waUrls)'>
     <div class="wa-side-head">
@@ -52,8 +52,30 @@
                     <li>Point your phone at this QR code</li>
                 </ol>
                 <div class="small-xs text-muted"><i class="bi bi-arrow-repeat"></i> The QR code refreshes by itself. Once linked, you stay signed in.</div>
+                <button type="button" class="btn btn-link btn-sm mt-2 p-0" data-wa-pair-open><i class="bi bi-phone"></i> Link with phone number (code) instead</button>
             </div>
             <div class="small-xs text-muted text-center mt-2"><i class="bi bi-lock-fill"></i> Only you can see your chats here</div>
+        </div>
+
+        {{-- Not linked yet: link with phone number + code (typed in WhatsApp on the phone) --}}
+        <div class="wa-view d-none" data-view="pair">
+            <form class="wa-login-card text-start" data-wa-pair-form>
+                <h6 class="fw-bold">Link with phone number</h6>
+                <label class="form-label small">Your WhatsApp number</label>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">+91</span>
+                    <input type="tel" name="number" class="form-control" placeholder="98765 43210" required maxlength="15" inputmode="numeric">
+                </div>
+                <button class="btn btn-success w-100"><i class="bi bi-key me-1"></i>Get code</button>
+                <div class="wa-pair-code d-none" data-wa-pair-code></div>
+                <ol class="wa-steps small mt-3 mb-2">
+                    <li>Open WhatsApp on that phone → <b>Menu ⋮ / Settings ⚙</b></li>
+                    <li><b>Linked Devices</b> → <b>Link a device</b></li>
+                    <li>Tap <b>Link with phone number instead</b></li>
+                    <li>Type the 8-letter code shown here</li>
+                </ol>
+                <button type="button" class="btn btn-link btn-sm p-0" data-wa-qr-open><i class="bi bi-qr-code"></i> Scan QR code instead</button>
+            </form>
         </div>
 
         {{-- Linked: chat list --}}

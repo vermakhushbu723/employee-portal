@@ -16,7 +16,7 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    public function store(LoginRequest $request, AuditLogger $audit)
+    public function store(LoginRequest $request, AuditLogger $audit, \App\Services\VpnGuard $vpn)
     {
         $credentials = [
             'employee_code' => strtoupper(trim($request->input('employee_code'))),
@@ -34,8 +34,27 @@ class LoginController extends Controller
             throw ValidationException::withMessages(['employee_code' => 'Your account is inactive. Please contact HR.']);
         }
 
+        // No sign-in through a VPN / proxy
+        if ($reason = $vpn->blockReason($user, $request->ip())) {
+            Auth::logout();
+            $audit->log('auth.blocked', 'Sign-in blocked: '.$reason, ['ip' => $request->ip()], $user);
+            throw ValidationException::withMessages(['employee_code' => $reason]);
+        }
+
+        // Location mandatory for this ID: the browser must send the position with the login
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+        $hasLocation = is_numeric($lat) && is_numeric($lng) && abs((float) $lat) <= 90 && abs((float) $lng) <= 180;
+        if ($user->location_required && ! $hasLocation) {
+            Auth::logout();
+            throw ValidationException::withMessages(['employee_code' => 'Location is mandatory for your ID. Allow location access for this site (lock icon in the address bar / app settings), turn on GPS and sign in again.']);
+        }
+
         $request->session()->regenerate();
-        $user->forceFill(['last_login_at' => now()])->save();
+        $request->session()->put('net_ip', $request->ip());
+        $user->forceFill(['last_login_at' => now()] + ($hasLocation ? [
+            'latitude' => round((float) $lat, 7), 'longitude' => round((float) $lng, 7), 'location_at' => now(), 'location_status' => 'ok',
+        ] : []))->save();
         $audit->log('auth.login', 'Signed in to the portal', [], $user);
 
         return redirect()->intended(route($user->homeRoute()));

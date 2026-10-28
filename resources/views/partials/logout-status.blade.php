@@ -18,7 +18,7 @@
                         <div class="modal-body">
                             <span class="decision-icon {{ $ok ? 'ok' : 'no' }}"><i class="bi bi-{{ $ok ? 'check-lg' : 'x-lg' }}"></i></span>
                             <h5 class="fw-bold mt-3">{{ $ok ? 'Your Logout Request Accepted By Management' : 'Your Logout Request Was Not Accepted' }}</h5>
-                            <p class="text-muted small mb-1">{{ $ok ? 'Accepted' : 'Reviewed' }} by {{ $s->reviewer?->name ?? 'management' }} at {{ $s->reviewed_at?->format('h:i A') }}.</p>
+                            <p class="text-muted small mb-1">{{ $ok ? 'Accepted' : 'Reviewed' }} by {{ $s->reviewer?->publicName() ?? 'management' }} at {{ $s->reviewed_at?->format('h:i A') }}.</p>
                             @if ($s->logout_note)<p class="small mb-1">“{{ $s->logout_note }}”</p>@endif
                             <p class="small mb-0">{{ $ok ? 'Your day is closed. You can sign out now.' : 'Your day is open again — please continue your work.' }}</p>
                         </div>

@@ -10,6 +10,7 @@
  *   GET  /s/:sid/chats?q=         latest chats
  *   GET  /s/:sid/messages?jid=    messages of one chat (marks them read)
  *   POST /s/:sid/send             { jid | number, text }
+ *   POST /s/:sid/pair             { number } → { code } link with phone number (8-letter code typed in WhatsApp)
  *   POST /s/:sid/logout           unlink the device and forget the session
  *
  * Every request needs header X-Gateway-Key. Login data stays in data/<sid>/auth, chat list in data/<sid>/store.json.
@@ -114,7 +115,7 @@ async function startSession(sid) {
     if (sessions.size >= MAX_SESSIONS) unloadIdle(true);
     const dir = path.join(DATA, sid);
     fs.mkdirSync(dir, { recursive: true });
-    s = { sid, dir, state: 'starting', qr: null, me: null, sock: null, store: new Store(path.join(dir, 'store.json')), seen: Date.now(), retries: 0, stopped: false };
+    s = { sid, dir, state: 'starting', qr: null, pair: null, me: null, sock: null, store: new Store(path.join(dir, 'store.json')), seen: Date.now(), retries: 0, stopped: false };
     sessions.set(sid, s);
     await connect(s);
     return s;
@@ -143,7 +144,7 @@ async function connect(s) {
         // Error correction "H" keeps the QR scannable with the WhatsApp logo on top of it
         if (qr) { s.state = 'qr'; s.qr = await QRCode.toDataURL(qr, { margin: 1, width: 300, errorCorrectionLevel: 'H' }); }
         if (connection === 'open') {
-            s.state = 'connected'; s.qr = null; s.retries = 0;
+            s.state = 'connected'; s.qr = null; s.pair = null; s.retries = 0;
             s.me = { id: jidNormalizedUser(sock.user?.id || ''), name: sock.user?.name || sock.user?.verifiedName || '' };
             log(s.sid, 'connected', s.me.id);
         }
@@ -217,7 +218,7 @@ const server = http.createServer(async (req, res) => {
         const url = new URL(req.url, 'http://local');
         if (url.pathname === '/health') return json(res, 200, { ok: true, sessions: sessions.size, uptime: Math.round(process.uptime()) });
 
-        const m = url.pathname.match(/^\/s\/([a-z0-9_-]{1,40})\/(start|status|chats|messages|send|logout)$/i);
+        const m = url.pathname.match(/^\/s\/([a-z0-9_-]{1,40})\/(start|status|chats|messages|send|logout|pair)$/i);
         if (!m) return json(res, 404, { error: 'not found' });
         const [, sid, action] = m;
 
@@ -225,7 +226,23 @@ const server = http.createServer(async (req, res) => {
             const s = action === 'start' ? await startSession(sid) : sessions.get(sid);
             if (!s) return json(res, 200, { state: fs.existsSync(path.join(DATA, sid, 'auth', 'creds.json')) ? 'saved' : 'none', qr: null, me: null });
             s.seen = Date.now();
-            return json(res, 200, { state: s.state, qr: s.qr, me: s.me });
+            return json(res, 200, { state: s.state, qr: s.qr, pair: s.pair, me: s.me });
+        }
+        if (action === 'pair' && req.method === 'POST') {
+            // Link with phone number: WhatsApp shows "Enter code" on the phone; no QR scan needed
+            const s = await startSession(sid);
+            s.seen = Date.now();
+            if (s.state === 'connected') return json(res, 409, { error: 'WhatsApp is already linked' });
+            let digits = String((await readBody(req)).number || '').replace(/\D/g, '');
+            if (digits.length === 10) digits = '91' + digits;
+            if (digits.length < 11 || digits.length > 15) return json(res, 422, { error: 'Enter your WhatsApp number with country code' });
+            // The socket must be waiting for a login (QR shown) before a code can be asked for
+            for (let i = 0; i < 40 && s.state !== 'qr'; i++) await new Promise((r) => setTimeout(r, 250));
+            if (s.state !== 'qr' || !s.sock) return json(res, 503, { error: 'WhatsApp is starting — try again in a moment' });
+            const raw = await s.sock.requestPairingCode(digits);
+            s.pair = { code: String(raw).replace(/(.{4})(?=.)/, '$1-'), number: digits, at: Date.now() };
+            log(sid, 'pairing code requested for', digits.slice(0, 4) + '…');
+            return json(res, 200, { code: s.pair.code });
         }
 
         const s = sessions.get(sid);

@@ -37,25 +37,33 @@
                 ? 'https://wa.me/'.preg_replace('/\D/', '', strlen(preg_replace('/\D/', '', $m->customer_mobile)) === 10 ? '91'.$m->customer_mobile : $m->customer_mobile)
                     .'?text='.rawurlencode("Hello {$m->customer_name}, your meeting \"{$m->title}\" is on {$m->scheduled_at->format('d M Y, h:i A')}. Join here: {$m->joinLink()}")
                 : null;
-            $fill = ['title_text' => $m->title.' — '.$m->customer_name, 'link' => $m->link, 'date' => $m->scheduled_at->toDateString(), 'time' => $m->scheduled_at->format('H:i')];
+            $fill = ['title_text' => $m->title.' — '.$m->customer_name, 'link' => $m->link, 'date' => $m->scheduled_at->toDateString(), 'time' => $m->scheduled_at->format('H:i'), 'end_time' => $m->endsAt()->format('H:i')];
         @endphp
         <div class="meeting-row">
             <div class="meeting-when">
                 <div class="fw-bold">{{ $m->scheduled_at->format('d M Y') }}</div>
-                <div class="small text-muted">{{ $m->scheduled_at->format('h:i A') }}</div>
+                <div class="small text-muted">{{ $m->timeRange() }}</div>
             </div>
             <div class="flex-grow-1 min-w-0">
                 <div class="fw-600 text-truncate">{{ $m->customer_name }} @if ($m->city)<span class="small text-muted fw-normal">· {{ $m->city }}</span>@endif</div>
                 <div class="small text-muted text-truncate">{{ $m->title }} · <i class="bi bi-{{ $m->platformIcon() }}"></i> {{ $m->platformLabel() }}@if ($m->customer_mobile) · {{ $m->customer_mobile }}@endif</div>
-                @if ($m->creator && $m->creator->id !== $m->user_id)<div class="small-xs text-muted">Given by {{ $m->creator->name }}</div>@endif
+                @if ($m->creator && $m->creator->id !== $m->user_id)<div class="small-xs text-muted">Given by {{ $m->creator->publicName() }}</div>@endif
                 @if ($m->notes)<div class="small-xs text-muted text-truncate">{{ $m->notes }}</div>@endif
                 @if ($m->participants->isNotEmpty())<div class="small-xs text-muted"><i class="bi bi-people"></i> {{ $m->participants->map(fn ($p) => $p->name.($p->pivot->role === 'primary' ? ' (primary)' : ''))->implode(', ') }}</div>@endif
                 @if ($m->notified)<div class="small-xs text-muted"><i class="bi bi-send"></i> Invite: {{ collect($m->notified)->where('ok', true)->count() }} sent of {{ count($m->notified) }}</div>@endif
             </div>
-            @if ($om = $m->outcomeMeta())
-                <span class="text-end"><x-badge :tone="$om[1]"><i class="bi bi-{{ $om[2] }}"></i> {{ $om[0] }}</x-badge>@if ($m->durationLabel())<div class="small-xs text-muted">{{ $m->durationLabel() }}</div>@endif</span>
+            @if ($m->status === 'completed' && ($om = $m->outcomeMeta()))
+                <span class="text-end">
+                    <x-badge :tone="$om[1]"><i class="bi bi-{{ $om[2] }}"></i> {{ $om[0] }}</x-badge>
+                    @if ($tm = $m->tagMeta())<x-badge :tone="$tm[1]"><i class="bi bi-{{ $tm[2] }}"></i> {{ $tm[0] }}</x-badge>@endif
+                    @if ($m->durationLabel())<div class="small-xs text-muted">{{ $m->durationLabel() }}</div>@endif
+                </span>
             @else
-                <x-badge :tone="$tone">{{ $label }}</x-badge>
+                <span class="text-end">
+                    <x-badge :tone="$tone">{{ $label }}</x-badge>
+                    @if ($m->needsReview())<div class="small-xs text-muted">Stays open — management closes it</div>@endif
+                    @if ($tm = $m->tagMeta())<div><x-badge :tone="$tm[1]">{{ $tm[0] }}</x-badge></div>@endif
+                </span>
             @endif
             <div class="meeting-actions">
                 @if ($m->status === 'pending')
@@ -110,15 +118,17 @@
                     </div>
                 </div>
                 <div class="col-md-4"><label class="form-label required">Date</label><input type="date" name="date" class="form-control" min="{{ today()->toDateString() }}" value="{{ old('date', today()->toDateString()) }}" required></div>
-                <div class="col-md-3"><label class="form-label required">Time</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required></div>
-                <div class="col-md-5" data-link-field>
+                <div class="col-6 col-md-4"><label class="form-label required">From time</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required data-from-time></div>
+                <div class="col-6 col-md-4"><label class="form-label required">To time</label><input type="time" name="end_time" class="form-control" value="{{ old('end_time') }}" required data-to-time></div>
+                <div class="col-12 small-xs text-muted mt-1"><i class="bi bi-info-circle"></i> The meeting link works the whole time and stays open after it — only management closes the meeting.</div>
+                <div class="col-md-7" data-link-field>
                     <label class="form-label">Meeting link</label>
                     <div class="input-group">
                         <input type="url" name="link" class="form-control" value="{{ old('link') }}" placeholder="https://meet.google.com/…">
                         <button type="button" class="btn btn-outline-primary" data-create-link title="Opens the platform to create a new meeting — copy its link here"><i class="bi bi-plus-circle"></i> Create</button>
                     </div>
                 </div>
-                <div class="col-md-5 d-none" data-portal-note><div class="info-box h-100"><i class="bi bi-camera-video-fill"></i><div>Joins <b>inside the dashboard</b>. The customer gets a join link (send it on WhatsApp from the list) — no app or login needed.</div></div></div>
+                <div class="col-md-7 d-none" data-portal-note><div class="info-box h-100"><i class="bi bi-camera-video-fill"></i><div>Joins <b>inside the dashboard</b>. The customer gets a join link (send it on WhatsApp from the list) — no app or login needed.</div></div></div>
                 <div class="col-12"><label class="form-label">Notes (optional)</label><textarea name="notes" rows="2" class="form-control" maxlength="1000">{{ old('notes') }}</textarea></div>
 
                 {{-- Who joins + who gets the invite --}}
@@ -169,8 +179,9 @@
             </div>
             <div class="modal-body pt-0 row g-3">
                 <div class="col-12"><label class="form-label">Meeting link</label><input type="url" name="link" class="form-control" placeholder="https://…"></div>
-                <div class="col-7"><label class="form-label required">Date</label><input type="date" name="date" class="form-control" min="{{ today()->toDateString() }}" required></div>
-                <div class="col-5"><label class="form-label required">Time</label><input type="time" name="time" class="form-control" required></div>
+                <div class="col-12"><label class="form-label required">Date</label><input type="date" name="date" class="form-control" min="{{ today()->toDateString() }}" required></div>
+                <div class="col-6"><label class="form-label required">From time</label><input type="time" name="time" class="form-control" required data-from-time></div>
+                <div class="col-6"><label class="form-label required">To time</label><input type="time" name="end_time" class="form-control" required data-to-time></div>
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>

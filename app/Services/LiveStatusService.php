@@ -55,6 +55,12 @@ class LiveStatusService
         if (! empty($device['geo'])) {
             $fill['location_status'] = $device['geo'];
         }
+        // Network range (type, speed, delay of the heartbeat)
+        $fill['network_type'] = $device['net'] ?? null;
+        $fill['network_mbps'] = isset($device['mbps']) ? round((float) $device['mbps'], 2) : null;
+        if (isset($device['rtt'])) {
+            $fill['network_rtt'] = (int) $device['rtt'];
+        }
         if (isset($device['lat'], $device['lng'])) {
             $fill += [
                 'latitude' => round((float) $device['lat'], 7),
@@ -80,6 +86,28 @@ class LiveStatusService
         $user->forceFill($fill)->saveQuietly();
     }
 
+    /** Network range for the live table: [bars 1–4, tone, label, details] or null when not reported today. */
+    public static function network(User $user): ?array
+    {
+        if (! $user->device_at?->isToday() || ($user->network_rtt === null && ! $user->network_type)) {
+            return null;
+        }
+        $rtt = $user->network_rtt;
+        $type = $user->network_type;
+        $bars = match (true) {
+            in_array($type, ['slow-2g', '2g'], true) => 1,
+            $rtt === null => $type === '3g' ? 2 : 3,
+            $rtt < 400 => $type === '3g' ? 3 : 4,
+            $rtt < 900 => 3,
+            $rtt < 2000 => 2,
+            default => 1,
+        };
+        $label = strtoupper(str_replace(['wifi', 'ethernet', 'cellular'], ['Wi-Fi', 'LAN', 'Mobile'], (string) ($type ?: 'Net')));
+        $details = trim(($user->network_mbps ? rtrim(rtrim(number_format((float) $user->network_mbps, 1), '0'), '.').' Mbps · ' : '').($rtt !== null ? $rtt.' ms' : ''), ' ·');
+
+        return [$bars, [1 => 'danger', 2 => 'warning', 3 => 'success', 4 => 'success'][$bars], $label === 'WI-FI' ? 'Wi-Fi' : $label, $details];
+    }
+
     /** One live row per user (today). */
     public function rows(Collection $users): Collection
     {
@@ -95,12 +123,13 @@ class LiveStatusService
 
         $meetings = Meeting::whereIn('user_id', $ids)->whereDate('scheduled_at', today())
             ->whereNotIn('status', ['declined', 'cancelled'])->get()->groupBy('user_id');
+        $inRoom = array_flip(MeetingRoomService::inRoomUserIds($ids));
 
-        return $users->map(function (User $user) use ($sessions, $calls, $pendingNew, $meetings) {
+        return $users->map(function (User $user) use ($sessions, $calls, $pendingNew, $meetings, $inRoom) {
             $session = $sessions->get($user->id);
             $work = $session ? $this->score->forSession($user, $session) : null;
             $userMeetings = $meetings->get($user->id, collect());
-            $state = $this->state($user, $session, $userMeetings);
+            $state = $this->state($user, $session, $userMeetings, isset($inRoom[$user->id]));
             $called = (int) ($session?->calls_made ?? $calls[$user->id] ?? 0);
 
             return [
@@ -145,7 +174,7 @@ class LiveStatusService
         ];
     }
 
-    private function state(User $user, ?AttendanceSession $session, Collection $meetings): string
+    private function state(User $user, ?AttendanceSession $session, Collection $meetings, bool $inRoom = false): string
     {
         if (! $session) {
             return 'offline';
@@ -153,7 +182,8 @@ class LiveStatusService
         if (! $session->isOpen()) {
             return 'out';
         }
-        if ($meetings->contains(fn ($m) => $m->status === 'live')) {
+        // In the built-in room now, or in an outside (Google Meet / Zoom) meeting started in the last 3 hours
+        if ($inRoom || $meetings->contains(fn ($m) => $m->status === 'live' && ! $m->isPortal() && $m->started_at?->gt(now()->subHours(3)))) {
             return 'meeting';
         }
         if ($session->breaks->contains(fn ($b) => $b->ended_at === null)) {

@@ -81,7 +81,7 @@ class LeadReviewService
                 'type' => 'correction',
                 'from_status' => $from->value,
                 'to_status' => $to->value,
-                'note' => 'Reviewed & corrected by '.$reviewer->name.' ('.$reviewer->roleLabel().'): '.implode('; ', $changes).($note ? " — {$note}" : ''),
+                'note' => 'Reviewed & corrected by '.($reviewer->role->portal() === 'admin' ? \App\Models\User::MANAGEMENT : $reviewer->name.' ('.$reviewer->roleLabel().')').': '.implode('; ', $changes).($note ? " — {$note}" : ''),
             ]);
 
             // Interested / Converted removed → the employee's score goes down

@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => \App\Http\Middleware\EnsureFeature::class,
         ]);
 
+        $middleware->web(append: [\App\Http\Middleware\BlockVpn::class]);
+
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('home'));
     })

@@ -51,12 +51,12 @@
         state = s.state;
         if (s.state === 'connected') {
             save({ linked: true, me: s.me?.name || (s.me?.id ? '+' + s.me.id.split('@')[0] : '') });
-            if (['loading', 'qr', 'error'].includes(view)) { show('chats'); loadChats(); }
+            if (['loading', 'qr', 'pair', 'error'].includes(view)) { show('chats'); loadChats(); }
             return;
         }
         if (s.state === 'qr' && s.qr) {
             $('[data-wa-qr]').src = s.qr;
-            if (view !== 'qr') show('qr');
+            if (view !== 'qr' && view !== 'pair') show('qr');   // stays on the phone-number screen while a code is used
             return;
         }
         if (s.state === 'logged_out') { save({ linked: false }); started = false; boot(); return; }
@@ -190,6 +190,29 @@
     $('[data-wa-back]').addEventListener('click', () => { openJid = null; show('chats'); loadChats(); });
     $('[data-wa-new]').addEventListener('click', () => show('new'));
     $('[data-wa-retry]').addEventListener('click', boot);
+    // Link with phone number: the gateway asks WhatsApp for an 8-letter code, typed on the phone
+    $('[data-wa-pair-open]').addEventListener('click', () => show('pair'));
+    $('[data-wa-qr-open]').addEventListener('click', () => show('qr'));
+    $('[data-wa-pair-form]').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button.btn-success');
+        const box = $('[data-wa-pair-code]');
+        let number = e.target.number.value.replace(/\D/g, '');
+        if (number.length === 10) number = `91${number}`;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Getting code…';
+        try {
+            const res = await api('POST', urls.pair, { number });
+            box.innerHTML = `<small>Your code</small><b>${esc(res.code)}</b><small>Type it in WhatsApp within 2 minutes</small>`;
+            box.classList.remove('d-none');
+        } catch (err) {
+            box.innerHTML = `<small class="text-danger">${esc(err.message)}</small>`;
+            box.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-key me-1"></i>Get new code';
+        }
+    });
     $('[data-wa-logout]').addEventListener('click', async () => {
         if (!confirm('Log out WhatsApp from the portal? You can link it again with the QR code.')) return;
         try { await api('POST', urls.logout); } catch (e) { /* already gone */ }
@@ -217,7 +240,7 @@
         if (document.hidden) { timer = setTimeout(tick, 15000); return; }
         let next = 60000;
         if (visible() && started) {
-            if (view === 'qr' || view === 'loading') {
+            if (view === 'qr' || view === 'pair' || view === 'loading') {
                 try { applyStatus(await api('GET', urls.status)); } catch (e) { /* retry */ }
                 next = 2500;
             } else if (view === 'chat') { await loadMessages(); next = 3000; }

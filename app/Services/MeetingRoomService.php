@@ -64,7 +64,7 @@ class MeetingRoomService
         ]);
 
         return [
-            'peer' => ['id' => $peer->id, 'secret' => $peer->secret, 'name' => $peer->name],
+            'peer' => ['id' => $peer->id, 'secret' => $peer->secret, 'name' => $peer->name, 'since' => $peer->created_at->getTimestampMs()],
             'peers' => $this->peerList($m, $peer->id),
             'after' => (int) MeetingSignal::where('meeting_id', $m->id)->max('id'),
             'ice' => $this->iceServers(),
@@ -117,10 +117,47 @@ class MeetingRoomService
             ->where('last_seen_at', '>=', now()->subSeconds(self::PEER_TIMEOUT))->get();
     }
 
+    /** "since" (join time, ms) decides who connects to whom: the one who joined later calls. */
     private function peerList(Meeting $m, string $except): array
     {
         return $this->active($m)->where('id', '!=', $except)
-            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'role' => $p->role])->values()->all();
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'role' => $p->role, 'since' => $p->created_at->getTimestampMs()])->values()->all();
+    }
+
+    /** Users who are in any built-in meeting room right now ("In Meeting" on the dashboards). */
+    public static function inRoomUserIds(iterable $userIds): array
+    {
+        return MeetingPeer::whereIn('user_id', collect($userIds)->all())->whereNull('left_at')
+            ->where('last_seen_at', '>=', now()->subSeconds(self::PEER_TIMEOUT))
+            ->distinct()->pluck('user_id')->all();
+    }
+
+    /** Seconds in which at least two people were in the room together (the real meeting time). */
+    public function connectedSeconds(Meeting $m): int
+    {
+        $events = [];
+        foreach (MeetingPeer::where('meeting_id', $m->id)->get(['created_at', 'left_at', 'last_seen_at']) as $p) {
+            $from = $p->created_at->getTimestamp();
+            $to = min(($p->left_at ?? $p->last_seen_at ?? $p->created_at)->getTimestamp(), ($p->last_seen_at ?? $p->created_at)->getTimestamp() + self::PEER_TIMEOUT);
+            if ($to > $from) {
+                $events[] = [$from, 1];
+                $events[] = [$to, -1];
+            }
+        }
+        usort($events, fn ($a, $b) => $a[0] <=> $b[0] ?: $a[1] <=> $b[1]);
+
+        $total = 0;
+        $inRoom = 0;
+        $prev = null;
+        foreach ($events as [$t, $delta]) {
+            if ($inRoom >= 2 && $prev !== null) {
+                $total += $t - $prev;
+            }
+            $inRoom += $delta;
+            $prev = $t;
+        }
+
+        return $total;
     }
 
     /** STUN (free, Google) + optional TURN from .env for strict office / mobile networks. */

@@ -29,7 +29,7 @@
                 @if ($state === 'open')
                     On time until <b>{{ $checkIn['late_after'] }}</b>. After that, admin approval is needed.
                 @else
-                    Admin approved your late check-in. Today will be marked <b>Late</b>.
+                    Our Management Team approved your late check-in. Today will be marked <b>Late</b>.
                 @endif
             </div>
         @endif

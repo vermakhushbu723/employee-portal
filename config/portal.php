@@ -48,6 +48,14 @@ return [
         'turn_pass' => env('MEET_TURN_PASS'),
     ],
 
+    // Sign-in protection: no VPN / proxy, only these countries (IP checked with proxycheck.io, cached 12 h).
+    // Super Admin is never blocked. Location-mandatory IDs are set per employee (Employees → Edit → Location).
+    'security' => [
+        'vpn_block' => (bool) env('VPN_BLOCK', true),
+        'proxycheck_key' => env('PROXYCHECK_KEY'),
+        'allowed_countries' => array_values(array_filter(array_map('trim', explode(',', (string) env('VPN_ALLOWED_COUNTRIES', 'IN'))))),
+    ],
+
     // WhatsApp inside the portal: each user scans the QR in the side panel with their own phone.
     // The gateway (whatsapp-gateway/server.mjs) runs on the server and is started automatically when needed.
     'whatsapp' => [
@@ -192,6 +200,7 @@ Regards,
             ['route' => 'manager.team', 'icon' => 'broadcast', 'label' => 'Live Monitoring'],
             ['route' => 'manager.tracking', 'icon' => 'geo-alt', 'label' => 'Live Tracking'],
             ['route' => 'manager.meetings.index', 'icon' => 'camera-video', 'label' => 'Meetings'],
+            ['route' => 'manager.calls.index', 'icon' => 'telephone', 'label' => 'Call Log'],
             ['route' => 'manager.reports.daily', 'icon' => 'clipboard-data', 'label' => 'Daily Work Report'],
             ['route' => 'manager.corrections.index', 'active' => 'manager.corrections.*', 'icon' => 'pencil-square', 'label' => 'Correction Requests'],
             ['route' => 'manager.targets', 'icon' => 'bullseye', 'label' => 'Daily Targets'],
@@ -224,9 +233,11 @@ Regards,
             ['route' => 'admin.reports.daily', 'icon' => 'clipboard-data', 'label' => 'Daily Work Report'],
             ['route' => 'admin.corrections.index', 'active' => 'admin.corrections.*', 'icon' => 'pencil-square', 'label' => 'Correction Requests'],
             ['route' => 'admin.meetings.index', 'icon' => 'camera-video', 'label' => 'Meetings'],
+            ['route' => 'admin.calls.index', 'icon' => 'telephone', 'label' => 'Call Log'],
             ['route' => 'admin.logout-requests.index', 'icon' => 'box-arrow-right', 'label' => 'Logout Requests'],
             ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late Check-in Requests'],
             ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leave Approvals'],
+            ['route' => 'admin.mail-check', 'icon' => 'envelope-check', 'label' => 'Email Check'],
             ['heading' => 'Account'],
             ['route' => 'notifications.index', 'icon' => 'megaphone', 'label' => 'Announcements'],
             ['route' => 'profile.show', 'icon' => 'person-circle', 'label' => 'My Profile'],

@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
         Route::get('messages', 'messages')->name('messages');
         Route::post('send', 'send')->middleware('throttle:60,1')->name('send');
         Route::post('logout', 'logout')->name('logout');
+        Route::post('pair', 'pair')->middleware('throttle:6,1')->name('pair');
     });
 
     // Built-in meeting room API for staff (employee, admin, manager) — joins inside the dashboard
@@ -167,7 +168,6 @@ Route::middleware(['auth', 'feature:meetings', 'punched-in'])->prefix('employee'
             Route::post('{meeting}/decline', 'decline')->whereNumber('meeting')->name('decline');
             Route::post('{meeting}/join', 'join')->whereNumber('meeting')->name('join');
             Route::get('{meeting}/room', 'room')->whereNumber('meeting')->name('room');
-            Route::post('{meeting}/end', 'end')->whereNumber('meeting')->name('end');
         });
 });
 
@@ -189,6 +189,8 @@ Route::middleware(['auth', 'role:manager,team_leader'])
         Route::post('meetings', [MeetingAdminController::class, 'store'])->name('meetings.store');
         Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
         Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
+        Route::post('meetings/{meeting}/review', [MeetingAdminController::class, 'review'])->whereNumber('meeting')->name('meetings.review');
+        Route::get('calls', [\App\Http\Controllers\CallLogController::class, 'index'])->name('calls.index');
         Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
         Route::get('review', [LeadReviewController::class, 'index'])->name('review.index');
         Route::patch('review/leads/{lead}', [LeadReviewController::class, 'update'])->whereNumber('lead')->name('review.update');
@@ -229,6 +231,8 @@ Route::middleware(['auth', 'role:super_admin,hr'])
     ->prefix('admin')->name('admin.')
     ->group(function () {
         Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
+        Route::get('mail-check', [Admin\MailCheckController::class, 'index'])->name('mail-check');
+        Route::post('mail-check', [Admin\MailCheckController::class, 'send'])->middleware('throttle:5,1')->name('mail-check.send');
 
         // Live tracking, meetings and work-data corrections (same screens for admin and manager)
         Route::get('tracking', TrackingController::class)->name('tracking');
@@ -236,6 +240,8 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::post('meetings', [MeetingAdminController::class, 'store'])->name('meetings.store');
         Route::post('meetings/{meeting}/cancel', [MeetingAdminController::class, 'cancel'])->whereNumber('meeting')->name('meetings.cancel');
         Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
+        Route::post('meetings/{meeting}/review', [MeetingAdminController::class, 'review'])->whereNumber('meeting')->name('meetings.review');
+        Route::get('calls', [\App\Http\Controllers\CallLogController::class, 'index'])->name('calls.index');
         Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
         Route::get('review', [LeadReviewController::class, 'index'])->name('review.index');
         Route::patch('review/leads/{lead}', [LeadReviewController::class, 'update'])->whereNumber('lead')->name('review.update');

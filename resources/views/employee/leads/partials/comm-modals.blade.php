@@ -64,6 +64,11 @@
                 <div class="small text-muted">Talk time</div>
                 <div class="fs-3 fw-bold font-monospace" data-call-time>00:00</div>
                 <input type="text" name="note" class="form-control form-control-sm mt-2" maxlength="500" placeholder="Call note (optional)">
+                <label class="call-rec-pick mt-2">
+                    <input type="file" name="recording" accept="audio/*,.amr,.m4a,.3gp,.opus" class="d-none" data-call-rec>
+                    <i class="bi bi-mic-fill"></i> <span data-call-rec-name>Attach call recording (optional)</span>
+                </label>
+                <div class="small-xs text-muted">Your phone saves it in Recordings / Call recordings. Management can listen to it.</div>
             </div>
             <div class="modal-footer border-0"><button class="btn btn-success w-100">Save call</button></div>
         </form>

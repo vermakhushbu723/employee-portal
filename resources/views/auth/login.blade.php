@@ -48,8 +48,39 @@
                 <a href="{{ route('password.request') }}">Forgot Password?</a>
             </div>
 
+            {{-- Location sent with the login (required for IDs where admin set Location = Mandatory) --}}
+            <input type="hidden" name="lat"><input type="hidden" name="lng"><input type="hidden" name="geo">
+            <div class="small text-muted mb-2 d-none" data-login-geo></div>
+
             <button type="submit" class="btn btn-primary btn-lg w-100">Login</button>
         </form>
+        <script>
+        (() => {
+            const form = document.currentScript.previousElementSibling;
+            const note = form.querySelector('[data-login-geo]');
+            let pos = null;
+            let asked = null;
+            const ask = () => asked = asked || new Promise((resolve) => {
+                if (!navigator.geolocation) { form.geo.value = 'unsupported'; return resolve(); }
+                navigator.geolocation.getCurrentPosition(
+                    (p) => { pos = p; form.lat.value = p.coords.latitude.toFixed(7); form.lng.value = p.coords.longitude.toFixed(7); form.geo.value = 'ok'; resolve(); },
+                    (e) => { form.geo.value = e.code === 1 ? 'denied' : 'error'; resolve(); },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 120000 },
+                );
+            });
+            ask();
+            form.addEventListener('submit', async (e) => {
+                if (pos || form.dataset.waited) return;
+                e.preventDefault();
+                note.classList.remove('d-none');
+                note.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Getting your location…';
+                await Promise.race([ask(), new Promise((r) => setTimeout(r, 10000))]);
+                note.classList.add('d-none');
+                form.dataset.waited = '1';
+                form.requestSubmit ? form.requestSubmit() : form.submit();
+            });
+        })();
+        </script>
 
         <div class="divider-or my-3">OR</div>
 

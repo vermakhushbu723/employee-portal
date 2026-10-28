@@ -35,7 +35,7 @@
             <x-badge :tone="$lead->status->tone()" class="fs-6">{{ $lead->status->label($hr) }}</x-badge>
         </div>
         @if ($lead->corrected_at)
-            <div class="corrected-box mt-3"><i class="bi bi-patch-check-fill"></i><div><b>Review & correction by {{ $lead->corrector?->name }} ({{ $lead->corrector?->role->portal() === 'admin' ? 'Admin' : 'Manager' }})</b><div class="small">{{ $lead->correction_note }}</div></div></div>
+            <div class="corrected-box mt-3"><i class="bi bi-patch-check-fill"></i><div><b>Review & correction by {{ $lead->corrector?->role->portal() === 'admin' ? \App\Models\User::MANAGEMENT : $lead->corrector?->name.' (Manager)' }}</b><div class="small">{{ $lead->correction_note }}</div></div></div>
         @endif
     </div>
 

@@ -2,9 +2,14 @@
  * Built-in meeting room (WebRTC mesh, up to 8 people).
  * Video / audio go directly between browsers. The portal only relays the small connection
  * messages, polled about once a second:
- *   - whoever joins later sends an "offer" to everyone already in the room
+ *   - whoever joined later sends an "offer" to everyone already in the room
  *   - the others answer; both sides exchange network "candidates"
- * Chat lines use the same relay. Screen share swaps the camera track without reconnecting.
+ * Every connection always has one audio and one video "slot" in both directions. Camera / mic
+ * tracks are put into those slots (replaceTrack), so a mic or camera that becomes ready later —
+ * permission given after joining, camera switched on, screen share — reaches everyone without
+ * reconnecting. A connection that fails is rebuilt by the side that called.
+ * Remote sound plays from its own <audio> element; when the browser blocks sound until a tap,
+ * a "Tap to turn on sound" button appears.
  */
 (() => {
     const root = document.getElementById('meetRoom');
@@ -16,16 +21,17 @@
     const csrf = () => document.querySelector('meta[name=csrf-token]')?.content;
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    let local = null;          // MediaStream from camera / mic
-    let screen = null;         // MediaStream from screen share
-    let me = null;             // { id, secret, name }
+    let local = new MediaStream();   // camera / mic (tracks are added when the browser gives them)
+    let screen = null;               // MediaStream from screen share
+    let me = null;                   // { id, secret, name, since }
     let after = 0;
     let ice = [];
     let polling = null;
     let started = 0;
     let micOn = true;
     let camOn = true;
-    const peers = new Map();   // id -> { pc, name, role, tile, pending: [], remoteSet }
+    let mediaReady = null;           // promise: first camera / mic request finished
+    const peers = new Map();         // id -> { pc, gen, offerer, name, role, tile, audio, remote, pending, remoteSet, since, lostAt }
 
     /* ---------------- helpers */
     const post = async (url, data, keepalive = false) => {
@@ -43,7 +49,7 @@
             const res = await post(cfg.signal, { peer: me.id, secret: me.secret, batch: JSON.stringify(batch) });
             if (!res.ok && res.status !== 403) outbox = batch.concat(outbox); // retry next round
         } catch (e) { outbox = batch.concat(outbox); }
-        finally { flushing = false; }
+        finally { flushing = false; if (outbox.length && outbox.some((m) => m.type !== 'candidate')) flush(); }
     };
     setInterval(flush, 250);
     const send = (to, type, payload) => {
@@ -57,25 +63,82 @@
         $$('[data-toggle-mic]').forEach((b) => { b.classList.toggle('off', !micOn); b.querySelector('i').className = `bi bi-mic${micOn ? '-fill' : '-mute-fill'}`; });
         $$('[data-toggle-cam]').forEach((b) => { b.classList.toggle('off', !camOn); b.querySelector('i').className = `bi bi-camera-video${camOn ? '-fill' : '-off-fill'}`; });
         $('[data-local-muted]')?.classList.toggle('d-none', micOn);
-        const noVideo = !camOn || !local?.getVideoTracks().length;
+        const noVideo = !camOn || !local.getVideoTracks().length;
         $('[data-local-off]')?.classList.toggle('d-none', !noVideo || !!screen);
         $('[data-preview-off]')?.classList.toggle('d-none', !noVideo);
     };
 
     /* ---------------- camera / mic */
-    const getMedia = async () => {
-        try {
-            local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } });
-        } catch (e) {
-            try { local = await navigator.mediaDevices.getUserMedia({ audio: true }); camOn = false; } // no camera
-            catch (e2) { local = new MediaStream(); micOn = false; camOn = false; $('[data-lobby-msg]').textContent = 'Camera / microphone blocked — you can still join and watch. Allow them in the browser settings to speak.'; }
-        }
+    const trackOf = (kind) => (kind === 'video' && screen ? screen.getVideoTracks()[0] : local.getTracks().find((t) => t.kind === kind && t.readyState === 'live')) || null;
+    // Put the current camera / mic / screen into every connection
+    const refreshSenders = () => peers.forEach((p) => p.pc.getTransceivers().forEach((t) => {
+        const kind = t.receiver.track?.kind;
+        if (!kind || t.currentDirection === 'stopped' || t.stopped) return;
+        const track = trackOf(kind);
+        if (t.sender.track !== track) t.sender.replaceTrack(track).catch(() => {});
+        try { t.sender.setStreams?.(local); } catch (e) { /* older browser */ }
+    }));
+    const showLocal = () => {
         $('[data-preview]').srcObject = local;
-        $('[data-local]').srcObject = local;
+        $('[data-local]').srcObject = screen || local;
+    };
+    const addTracks = (stream) => {
+        stream.getTracks().forEach((t) => {
+            local.getTracks().filter((o) => o.kind === t.kind).forEach((o) => { o.stop(); local.removeTrack(o); });
+            local.addTrack(t);
+        });
+        showLocal();
+        refreshSenders();
+    };
+    const getMedia = async () => {
+        $('[data-lobby-msg]').textContent = 'Allow camera and microphone when the browser asks.';
+        try {
+            addTracks(await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } }));
+        } catch (e) {
+            try { addTracks(await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })); camOn = false; } // no camera
+            catch (e2) {
+                micOn = false; camOn = false;
+                $('[data-lobby-msg]').textContent = 'Camera / microphone blocked — you can still join and listen. Allow them in the browser settings (lock icon in the address bar), then tap the mic button.';
+            }
+        }
+        local.getAudioTracks().forEach((t) => { t.enabled = micOn; });
+        local.getVideoTracks().forEach((t) => { t.enabled = camOn; });
         syncButtons();
     };
-    const setMic = (on) => { micOn = on && !!local?.getAudioTracks().length; local?.getAudioTracks().forEach((t) => { t.enabled = micOn; }); syncButtons(); };
-    const setCam = (on) => { camOn = on && !!local?.getVideoTracks().length; local?.getVideoTracks().forEach((t) => { t.enabled = camOn; }); syncButtons(); };
+    // Mic / camera button: switches the track on or off; asks the browser again when there is none yet
+    const setMic = async (on) => {
+        if (on && !local.getAudioTracks().length) {
+            try { addTracks(await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })); }
+            catch (e) { toast('Microphone blocked', 'Allow the microphone for this site in the browser settings.'); }
+        }
+        micOn = on && !!local.getAudioTracks().length;
+        local.getAudioTracks().forEach((t) => { t.enabled = micOn; });
+        syncButtons();
+    };
+    const setCam = async (on) => {
+        if (on && !local.getVideoTracks().length) {
+            try { addTracks(await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } })); }
+            catch (e) { toast('Camera blocked', 'Allow the camera for this site in the browser settings.'); }
+        }
+        camOn = on && !!local.getVideoTracks().length;
+        local.getVideoTracks().forEach((t) => { t.enabled = camOn; });
+        syncButtons();
+    };
+
+    /* ---------------- sound (browsers may block it until the page is tapped) */
+    const soundBtn = document.createElement('button');
+    soundBtn.type = 'button';
+    soundBtn.className = 'meet-sound d-none';
+    soundBtn.innerHTML = '<i class="bi bi-volume-up-fill"></i> Tap to turn on sound';
+    root.appendChild(soundBtn);
+    const playAudio = (p) => {
+        const a = p.audio;
+        if (!a.srcObject) a.srcObject = p.remote;
+        const r = a.play();
+        if (r?.catch) r.then(() => { if (![...peers.values()].some((x) => x.audio.paused && x.remote.getAudioTracks().length)) soundBtn.classList.add('d-none'); })
+            .catch(() => soundBtn.classList.remove('d-none'));
+    };
+    soundBtn.addEventListener('click', () => { soundBtn.classList.add('d-none'); peers.forEach(playAudio); });
 
     /* ---------------- tiles */
     const updateCount = () => {
@@ -86,89 +149,150 @@
             .concat([...peers.values()].map((p) => `<li class="meet-person"><span class="meet-mini">${esc(p.name[0])}</span>${esc(p.name)} <span class="opacity-75">${p.role === 'guest' ? '(customer)' : ''}</span></li>`));
         $('[data-people]').innerHTML = people.join('');
     };
-    const addTile = (id, name) => {
+    const addTile = (name) => {
         const tile = document.createElement('div');
         tile.className = 'meet-tile';
-        tile.innerHTML = `<video autoplay playsinline></video><div class="meet-avatar">${esc(name[0] || '?')}</div><span class="meet-name">${esc(name)}</span><span class="meet-state">Connecting…</span><button type="button" class="meet-fs" data-tile-fs title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>`;
+        tile.innerHTML = `<video autoplay playsinline muted></video><audio autoplay></audio><div class="meet-avatar">${esc(name[0] || '?')}</div><span class="meet-name">${esc(name)}</span><span class="meet-state">Connecting…</span><button type="button" class="meet-fs" data-tile-fs title="Full screen"><i class="bi bi-arrows-fullscreen"></i></button>`;
         $('[data-grid]').appendChild(tile);
         return tile;
     };
+    const setName = (p, name) => {
+        if (!name || p.name === name) return;
+        p.name = name;
+        p.tile.querySelector('.meet-name').textContent = name;
+        p.tile.querySelector('.meet-avatar').textContent = name[0] || '?';
+        updateCount();
+    };
 
     /* ---------------- peer connections */
-    const createPeer = (id, name, role) => {
-        if (peers.has(id)) return peers.get(id);
+    const setupPc = (p, id) => {
+        try { p.pc?.close(); } catch (e) { /* closed */ }
         const pc = new RTCPeerConnection({ iceServers: ice });
-        const peer = { pc, name, role, tile: addTile(id, name), pending: [], remoteSet: false };
-        peers.set(id, peer);
+        p.pc = pc;
+        p.pending = [];
+        p.remoteSet = false;
+        p.connectedOnce = false;
+        p.lostAt = Date.now();
+        p.remote.getTracks().forEach((t) => p.remote.removeTrack(t));
 
-        // Send our camera + mic (or receive only when we have none)
-        const tracks = local?.getTracks() || [];
-        tracks.forEach((t) => pc.addTrack(t, local));
-        if (!local?.getAudioTracks().length) pc.addTransceiver('audio', { direction: 'recvonly' });
-        if (!local?.getVideoTracks().length) pc.addTransceiver('video', { direction: 'recvonly' });
-        if (screen) replaceVideo(screen.getVideoTracks()[0]);
-
-        pc.onicecandidate = (e) => { if (e.candidate) send(id, 'candidate', e.candidate); };
+        if (p.offerer) {
+            // The caller creates the two slots (audio + video), each sending and receiving
+            ['audio', 'video'].forEach((kind) => pc.addTransceiver(trackOf(kind) || kind, { direction: 'sendrecv', streams: [local] }));
+        }
+        pc.onicecandidate = (e) => { if (e.candidate) send(id, 'candidate', { c: e.candidate, gen: p.gen }); };
         pc.ontrack = (e) => {
-            const video = peer.tile.querySelector('video');
-            if (video.srcObject !== e.streams[0]) video.srcObject = e.streams[0] || new MediaStream([e.track]);
-            if (e.track.kind === 'video') {
-                const show = () => peer.tile.querySelector('.meet-avatar').classList.toggle('d-none', !e.track.muted);
-                e.track.onmute = show; e.track.onunmute = show; show();
+            if (pc !== p.pc) return;
+            const track = e.track;
+            p.remote.getTracks().filter((t) => t.kind === track.kind && t !== track).forEach((t) => p.remote.removeTrack(t));
+            if (!p.remote.getTracks().includes(track)) p.remote.addTrack(track);
+            const video = p.tile.querySelector('video');
+            if (video.srcObject !== p.remote) video.srcObject = p.remote;
+            video.play?.().catch(() => {});
+            if (track.kind === 'video') {
+                const show = () => p.tile.querySelector('.meet-avatar').classList.toggle('d-none', !track.muted);
+                track.onmute = show; track.onunmute = show; show();
+            } else {
+                playAudio(p);
             }
         };
         pc.onconnectionstatechange = () => {
-            const st = peer.tile.querySelector('.meet-state');
+            if (pc !== p.pc) return;
+            const st = p.tile.querySelector('.meet-state');
             const s = pc.connectionState;
-            st.textContent = s === 'connected' ? '' : s === 'failed' ? 'Connection failed' : 'Connecting…';
+            st.textContent = s === 'connected' ? '' : s === 'failed' ? 'Reconnecting…' : s === 'disconnected' ? 'Weak network…' : 'Connecting…';
             st.classList.toggle('d-none', s === 'connected');
-            if (s === 'failed') pc.restartIce?.();
+            if (s === 'connected') { p.connectedOnce = true; p.lostAt = null; playAudio(p); }
+            else if (!p.lostAt) p.lostAt = Date.now();
         };
+    };
+    const createPeer = (id, name, role, offerer, since = 0) => {
+        if (peers.has(id)) return peers.get(id);
+        const p = { pc: null, gen: offerer ? Date.now() : 0, offerer, name: name || '…', role, since, remote: new MediaStream(), tile: addTile(name || '…') };
+        p.audio = p.tile.querySelector('audio');
+        peers.set(id, p);
+        setupPc(p, id);
         updateCount();
-        return peer;
+        return p;
     };
     const removePeer = (id) => {
         const p = peers.get(id);
         if (!p) return;
-        p.pc.close();
+        try { p.pc.close(); } catch (e) { /* closed */ }
         p.tile.remove();
         peers.delete(id);
         updateCount();
     };
     const call = async (id) => {
         const p = peers.get(id);
-        const offer = await p.pc.createOffer();
-        await p.pc.setLocalDescription(offer);
-        send(id, 'offer', p.pc.localDescription);
+        if (!p) return;
+        const pc = p.pc;
+        const offer = await pc.createOffer();
+        if (pc !== p.pc) return;
+        await pc.setLocalDescription(offer);
+        send(id, 'offer', { type: 'offer', sdp: pc.localDescription.sdp, gen: p.gen, name: me?.name });
     };
+    // The caller rebuilds a connection that failed or never connected
+    const restart = (id) => {
+        const p = peers.get(id);
+        if (!p || !p.offerer) return;
+        p.gen = Date.now();
+        setupPc(p, id);
+        call(id).catch((e) => console.warn('meeting: re-offer failed', e));
+    };
+    setInterval(() => {
+        if (!me) return;
+        peers.forEach((p, id) => {
+            const s = p.pc.connectionState;
+            const waited = p.lostAt ? Date.now() - p.lostAt : 0;
+            if (p.offerer && ((s === 'failed' && waited > 3000) || (s !== 'connected' && waited > (p.connectedOnce ? 12000 : 20000)))) restart(id);
+        });
+    }, 3000);
     const flushCandidates = async (p) => {
         while (p.pending.length) { try { await p.pc.addIceCandidate(p.pending.shift()); } catch (e) { /* stale */ } }
     };
 
-    const handle = async (s) => {
+    const handle = async (s, listed) => {
         if (!me) return;
         let data;
         try { data = JSON.parse(s.payload); } catch (e) { return; }
         if (s.type === 'chat') { addChat(data.name, data.text, false); return; }
 
-        const known = peers.get(s.from);
+        let p = peers.get(s.from);
         if (s.type === 'offer') {
-            const p = known || createPeer(s.from, data.name || '…', data.role || '');
-            await p.pc.setRemoteDescription(data.sdp ? { type: 'offer', sdp: data.sdp } : data);
-            p.remoteSet = true;
-            await flushCandidates(p);
-            const answer = await p.pc.createAnswer();
-            await p.pc.setLocalDescription(answer);
-            send(s.from, 'answer', p.pc.localDescription);
-        } else if (s.type === 'answer' && known) {
-            if (known.pc.signalingState === 'have-local-offer') {
-                await known.pc.setRemoteDescription(data);
-                known.remoteSet = true;
-                await flushCandidates(known);
+            const info = listed.get(s.from) || {};
+            if (!p) p = createPeer(s.from, info.name || data.name, info.role || '', false, info.since || 0);
+            setName(p, info.name || data.name);
+            if (p.offerer) {
+                // Both sides called at once: the one who joined earlier answers, the later one keeps calling
+                if ((me.since || 0) > (p.since || 0)) return;
+                p.offerer = false;
             }
-        } else if (s.type === 'candidate' && known) {
-            if (known.remoteSet) { try { await known.pc.addIceCandidate(data); } catch (e) { /* stale */ } }
-            else known.pending.push(data);
+            if (p.gen !== data.gen) { p.gen = data.gen; setupPc(p, s.from); }   // new / rebuilt connection from the caller
+            const pc = p.pc;
+            await pc.setRemoteDescription({ type: 'offer', sdp: data.sdp });
+            p.remoteSet = true;
+            // Answer with our camera + mic in the caller's two slots
+            for (const t of pc.getTransceivers()) {
+                const kind = t.receiver.track?.kind;
+                if (!kind) continue;
+                t.direction = 'sendrecv';
+                try { await t.sender.replaceTrack(trackOf(kind)); } catch (e) { /* none */ }
+                try { t.sender.setStreams?.(local); } catch (e) { /* older browser */ }
+            }
+            await flushCandidates(p);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            send(s.from, 'answer', { type: 'answer', sdp: pc.localDescription.sdp, gen: p.gen });
+        } else if (s.type === 'answer' && p) {
+            if (data.gen === p.gen && p.pc.signalingState === 'have-local-offer') {
+                await p.pc.setRemoteDescription({ type: 'answer', sdp: data.sdp });
+                p.remoteSet = true;
+                await flushCandidates(p);
+            }
+        } else if (s.type === 'candidate' && p) {
+            if (data.gen !== p.gen) return;   // from an old connection
+            if (p.remoteSet) { try { await p.pc.addIceCandidate(data.c); } catch (e) { /* stale */ } }
+            else p.pending.push(data.c);
         }
     };
 
@@ -184,16 +308,19 @@
             $('[data-net]').textContent = '';
             const data = await res.json();
             after = data.after;
-            // Names of people in the room (the offer itself does not carry them)
             const listed = new Map(data.peers.map((p) => [p.id, p]));
             for (const s of data.signals) {
-                if (s.type === 'offer' && listed.has(s.from) && !peers.has(s.from)) createPeer(s.from, listed.get(s.from).name, listed.get(s.from).role);
-                await handle(s);
+                try { await handle(s, listed); } catch (e) { console.warn('meeting: signal', s.type, e); }
             }
             peers.forEach((p, id) => { if (!listed.has(id)) { removePeer(id); toast('Left the meeting', p.name); } });
-            listed.forEach((p, id) => {
-                const known = peers.get(id);
-                if (known && known.name === '…') { known.name = p.name; known.tile.querySelector('.meet-name').textContent = p.name; updateCount(); }
+            listed.forEach((info, id) => {
+                const p = peers.get(id);
+                if (p) { setName(p, info.name); p.since = info.since; return; }
+                // Someone who joined before us that we are not connected to yet (e.g. their offer was lost): we call
+                if ((info.since || 0) < (me.since || 0) || ((info.since || 0) === (me.since || 0) && id < me.id)) {
+                    createPeer(id, info.name, info.role, true, info.since);
+                    call(id).catch((e) => console.warn('meeting: offer failed', e));
+                }
             });
             if (data.ended) leave('The meeting has ended');
         } catch (e) { $('[data-net]').textContent = 'Reconnecting…'; console.warn('meeting: poll', e); }
@@ -236,15 +363,11 @@
     $('[data-side-close]').addEventListener('click', () => { $('[data-side]').classList.add('d-none'); sideOpen = false; });
 
     /* ---------------- screen share */
-    const replaceVideo = (track) => peers.forEach((p) => {
-        const sender = p.pc.getSenders().find((s) => s.track?.kind === 'video') || p.pc.getTransceivers().find((t) => t.receiver.track?.kind === 'video')?.sender;
-        sender?.replaceTrack(track).catch(() => {});
-    });
     const stopScreen = () => {
         screen?.getTracks().forEach((t) => t.stop());
         screen = null;
-        replaceVideo(local?.getVideoTracks()[0] || null);
-        $('[data-local]').srcObject = local;
+        refreshSenders();
+        showLocal();
         $('[data-screen]')?.classList.remove('on');
         syncButtons();
     };
@@ -252,10 +375,9 @@
         if (screen) { stopScreen(); return; }
         try {
             screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const track = screen.getVideoTracks()[0];
-            track.onended = stopScreen;
-            replaceVideo(track);
-            $('[data-local]').srcObject = screen;
+            screen.getVideoTracks()[0].onended = stopScreen;
+            refreshSenders();
+            showLocal();
             $('[data-screen]').classList.add('on');
             syncButtons();
         } catch (e) { /* cancelled */ }
@@ -280,6 +402,8 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Joining…';
         try {
+            // Wait for camera / mic first (up to 15 s for the permission popup) so others hear us from the start
+            await Promise.race([mediaReady, new Promise((r) => setTimeout(r, 15000))]);
             const res = await post(cfg.join, data);
             const json = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(json.message || 'Could not join the meeting.');
@@ -291,12 +415,12 @@
             $('[data-left]').classList.add('d-none');
             $('[data-call]').classList.remove('d-none');
             document.body.classList.add('in-meeting');
-            // Start listening first, then offer to everyone already in the room (in parallel)
+            // Start listening first, then call everyone already in the room (in parallel)
             polling = setInterval(poll, 1000);
             clock = setInterval(timer, 1000);
             timer();
             json.peers.forEach((p) => {
-                createPeer(p.id, p.name, p.role);
+                createPeer(p.id, p.name, p.role, true, p.since);
                 call(p.id).catch((e) => console.warn('meeting: offer failed', e));
             });
             updateCount();
@@ -314,6 +438,7 @@
         post(cfg.leave, { peer: me.id, secret: me.secret }, true).catch(() => {});
         [...peers.keys()].forEach(removePeer);
         if (screen) stopScreen();
+        soundBtn.classList.add('d-none');
         me = null;
         $('[data-call]').classList.add('d-none');
         $('[data-left]').classList.remove('d-none');
@@ -345,7 +470,10 @@
     $('[data-join]').addEventListener('click', join);
     $('[data-leave]').addEventListener('click', () => leave());
     $('[data-rejoin]').addEventListener('click', () => { $('[data-left]').classList.add('d-none'); join(); });
-    $('[data-end-form]')?.addEventListener('submit', () => leave('The meeting has ended'));
+    // Review inside the room: "Close Meeting" ends it for everyone; keep open / reschedule just leaves
+    document.querySelector('[data-review-form]')?.addEventListener('submit', (e) => {
+        leave(e.target.querySelector('input[name=action]:checked')?.value === 'close' ? 'The meeting has ended' : undefined);
+    });
     $$('[data-toggle-mic]').forEach((b) => b.addEventListener('click', () => setMic(!micOn)));
     $$('[data-toggle-cam]').forEach((b) => b.addEventListener('click', () => setCam(!camOn)));
     window.addEventListener('pagehide', () => { if (me) navigator.sendBeacon(cfg.leave, new URLSearchParams({ _token: csrf(), peer: me.id, secret: me.secret })); });
@@ -355,5 +483,5 @@
         $('[data-join]').disabled = true;
         return;
     }
-    getMedia();
+    mediaReady = getMedia();
 })();

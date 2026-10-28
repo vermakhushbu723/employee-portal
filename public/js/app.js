@@ -107,7 +107,11 @@
         const data = trigger.dataset.fill ? JSON.parse(trigger.dataset.fill) : {};
         Object.entries(data).forEach(([key, value]) => {
             modal.querySelectorAll(`[data-field="${key}"]`).forEach((el) => { el.textContent = value ?? '—'; });
-            modal.querySelectorAll(`[name="${key}"]`).forEach((el) => { el.value = value ?? ''; el.dispatchEvent(new Event('change')); });
+            modal.querySelectorAll(`[name="${key}"]`).forEach((el) => {
+                if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === String(value ?? '');
+                else el.value = value ?? '';
+                el.dispatchEvent(new Event('change'));
+            });
         });
 
         bootstrap.Modal.getOrCreateInstance(modal).show();
@@ -430,7 +434,7 @@
         const geoNotice = (show) => {
             let el = document.getElementById('geoNotice');
             if (!show) { el?.remove(); return; }
-            if (el) return;
+            if (el || document.getElementById('geoGate')) return;   // location-mandatory IDs get the full block instead
             try { if (sessionStorage.getItem('portal:geoDismissed')) return; } catch (e) { /* ignore */ } // closed once: not again this session
             el = document.createElement('div');
             el.id = 'geoNotice';
@@ -438,6 +442,7 @@
             el.innerHTML = '<i class="bi bi-geo-alt-fill"></i><div><b>Location access is off.</b> Allow location for this site in your browser settings — your manager sees it on the live dashboard.</div><button type="button" class="btn-close btn-sm" aria-label="Close"></button>';
             el.querySelector('button').addEventListener('click', () => { el.remove(); try { sessionStorage.setItem('portal:geoDismissed', '1'); } catch (e) { /* ignore */ } });
             document.body.appendChild(el);
+            setTimeout(() => el.remove(), 10000);   // a reminder only: does not stay over the page
         };
         const startGeo = () => {
             if (geoWatch !== null) return;
@@ -454,6 +459,14 @@
             if (device.battery) { p.battery = Math.round(device.battery.level * 100); p.charging = device.battery.charging ? 1 : 0; }
             if (device.geo) p.geo = device.geo;
             if (device.pos) { p.lat = device.pos.latitude.toFixed(7); p.lng = device.pos.longitude.toFixed(7); p.accuracy = Math.round(device.pos.accuracy); }
+            // Network range: type (4g / wifi…) + speed where the browser tells it, and the measured delay of the last beat
+            const c = navigator.connection;
+            if (c) {
+                if (c.type && c.type !== 'unknown') p.net = c.type === 'cellular' ? (c.effectiveType || 'cellular') : c.type;
+                else if (c.effectiveType) p.net = c.effectiveType;
+                if (c.downlink) p.mbps = c.downlink;
+            }
+            if (device.rtt) p.rtt = device.rtt;
             return p;
         };
         if (cfg.tracking || cfg.on_shift) startGeo();
@@ -467,7 +480,10 @@
             store.set('portal:beatAt', Date.now());
             try {
                 const body = new URLSearchParams({ _token: csrf(), active: isActive() ? 1 : 0, ...deviceParams() });
+                const t0 = performance.now();
                 const res = await fetch(cfg.url, { method: 'POST', body, headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                device.rtt = Math.round(performance.now() - t0);
+                if (res.status === 401) { location.href = '/login'; return; }   // signed out (e.g. VPN switched on)
                 if (!res.ok) return;
                 const data = await res.json();
                 seconds = data.active_seconds;
@@ -482,6 +498,43 @@
         beat(true);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) { touch(); beat(); } });
         render();
+    }
+
+    /* ------------------------------------------------------------------ Meeting from / to time */
+    // Choosing the from-time fills the to-time with +30 minutes (when empty or not after it)
+    document.addEventListener('change', (e) => {
+        const from = e.target.closest('[data-from-time]');
+        const to = from?.form?.querySelector('[data-to-time]');
+        if (!to || !from.value) return;
+        const [h, m] = from.value.split(':').map(Number);
+        if (to.value && to.value > from.value) return;
+        const end = (h * 60 + m + 30) % 1440;
+        to.value = `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+    });
+
+    /* ------------------------------------------------------------------ Location mandatory (per ID) */
+    // The portal / app cannot be used while location is blocked or GPS is off.
+    const geoGate = document.getElementById('geoGate');
+    if (geoGate) {
+        const msg = geoGate.querySelector('[data-geo-gate-msg]');
+        const block = (text) => { msg.textContent = text; geoGate.classList.remove('d-none'); document.body.classList.add('geo-blocked'); };
+        const free = () => { geoGate.classList.add('d-none'); document.body.classList.remove('geo-blocked'); };
+        const check = () => {
+            if (!navigator.geolocation) { block('This browser cannot share location. Please use Chrome or the portal app.'); return; }
+            const slow = setTimeout(() => block('Waiting for your location… make sure Location / GPS is on.'), 4000);
+            navigator.geolocation.getCurrentPosition(
+                () => { clearTimeout(slow); free(); },
+                (err) => { clearTimeout(slow); block(err.code === 1 ? 'Location access is blocked for this site.' : 'Your location could not be found — turn on Location / GPS.'); },
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
+            );
+        };
+        geoGate.querySelector('[data-geo-gate-retry]').addEventListener('click', check);
+        navigator.permissions?.query({ name: 'geolocation' }).then((st) => {
+            if (st.state === 'denied') block('Location access is blocked for this site.');
+            st.onchange = check;
+        }).catch(() => {});
+        check();
+        setInterval(check, 120000);   // switched off later → blocked again
     }
 
     /* ------------------------------------------------------------------ Live clock in punch-in popup */

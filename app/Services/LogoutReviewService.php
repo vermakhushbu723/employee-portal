@@ -107,7 +107,7 @@ class LogoutReviewService
         Announcement::create([
             'user_id' => $s->user_id, 'created_by' => $by->id, 'type' => 'important',
             'title' => 'Your Logout Request Accepted By Management',
-            'body' => "Approved by {$by->name}".($note ? " — {$note}" : '').'. You can sign out now.',
+            'body' => 'Approved by '.$by->publicName().($note ? " — {$note}" : '').'. You can sign out now.',
         ]);
         $this->audit->log('logout.approve', "Approved logout request of {$s->user->employee_code} by {$how}", ['session_id' => $s->id], $by);
     }

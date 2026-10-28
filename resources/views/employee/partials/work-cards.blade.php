@@ -33,7 +33,7 @@
                             <div class="fw-bold text-truncate">{{ $t->title }}</div>
                             <div class="small text-muted">
                                 {{ $calling ? 'Total Records: '.$p['total'] : 'Total Target: '.$t->lead_target.' Leads' }}
-                                · Assigned: {{ $t->assigned_at->format('d M Y') }}{{ $t->assigner ? ' by '.$t->assigner->name : '' }}
+                                · Assigned: {{ $t->assigned_at->format('d M Y') }}{{ $t->assigner ? ' by '.$t->assigner->publicName() : '' }}
                             </div>
                         </div>
                     </div>
@@ -41,7 +41,7 @@
                     @if ($t->message)
                         <div class="wc-message">
                             <i class="bi bi-chat-square-text-fill"></i>
-                            <div><div class="fw-600 small">Work Details (From {{ $t->assigner?->role->portal() === 'manager' ? 'Manager' : 'Admin' }})</div><div class="small">{!! nl2br(e($t->message)) !!}</div></div>
+                            <div><div class="fw-600 small">Work Details (From {{ $t->assigner?->role->portal() === 'manager' ? 'Manager' : \App\Models\User::MANAGEMENT }})</div><div class="small">{!! nl2br(e($t->message)) !!}</div></div>
                         </div>
                     @endif
 

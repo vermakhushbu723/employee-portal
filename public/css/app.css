@@ -875,3 +875,42 @@ body.in-meeting .geo-notice, body.in-meeting .wa-fab, body.in-meeting .logout-re
 .detail-dl dd { margin: 0; }
 .detail-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
 @media (max-width: 575.98px) { .detail-dl { grid-template-columns: 120px 1fr; } .detail-actions .btn { padding: .5rem .2rem; font-size: .78rem; } }
+
+/* Meeting room fits the screen (no page scroll); name tags at the top so they are always visible */
+body.in-meeting .meet { height: calc(100dvh - var(--topbar-h) - 2rem); min-height: 0; position: relative; }
+body.in-meeting.meet-guest-body .meet { height: calc(100dvh - 1.2rem); }
+body.in-meeting .meet-body { min-height: 0; }
+body.in-meeting .meet-grid { grid-auto-rows: minmax(0, 1fr); align-content: stretch; align-items: stretch; min-height: 0; }
+body.in-meeting .meet-tile { aspect-ratio: auto; height: 100%; min-height: 0; }
+.meet-name { top: .6rem; bottom: auto; max-width: calc(100% - 7rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; z-index: 2; }
+.meet-tile audio { display: none; }
+.meet-sound { position: absolute; left: 50%; bottom: 6.5rem; transform: translateX(-50%); z-index: 6; border: 0; border-radius: 999px; padding: .6rem 1.1rem; background: #25D366; color: #fff; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); animation: meetPulse 1.4s ease-in-out infinite; }
+@keyframes meetPulse { 50% { transform: translateX(-50%) scale(1.06); } }
+
+/* Network bars (live table) */
+.net-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; margin-right: .2rem; vertical-align: -1px; }
+.net-bars i { width: 3px; background: currentColor; opacity: .2; border-radius: 1px; }
+.net-bars i:nth-child(1) { height: 4px; } .net-bars i:nth-child(2) { height: 7px; } .net-bars i:nth-child(3) { height: 10px; } .net-bars i:nth-child(4) { height: 12px; }
+.net-bars i.on { opacity: 1; }
+
+/* Location mandatory: full-screen block */
+.geo-gate { position: fixed; inset: 0; z-index: 3000; background: rgba(16, 24, 22, .88); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 16px; }
+.geo-gate-card { width: min(420px, 100%); background: #fff; border-radius: 18px; padding: 1.6rem; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); }
+.geo-gate-icon { width: 64px; height: 64px; border-radius: 50%; display: inline-grid; place-items: center; background: #FDECEA; color: #D9483B; font-size: 1.8rem; }
+body.geo-blocked { overflow: hidden; }
+
+/* Two-way choice (radio pills) */
+.seg-choice { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
+.seg-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-choice span { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .9rem; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; font-size: .85rem; font-weight: 600; }
+.seg-choice input:checked + span { background: var(--brand); border-color: var(--brand); color: #fff; }
+.seg-choice input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* WhatsApp: link with phone number code */
+.wa-pair-code { margin-top: .8rem; padding: .7rem; border-radius: 12px; background: #E7F8EE; text-align: center; display: flex; flex-direction: column; gap: .15rem; }
+.wa-pair-code b { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.7rem; letter-spacing: .18em; color: #128C4B; }
+
+/* Call recording */
+.call-rec-pick { display: flex; align-items: center; justify-content: center; gap: .4rem; padding: .45rem .6rem; border: 1px dashed var(--line); border-radius: 10px; font-size: .8rem; cursor: pointer; color: var(--brand); }
+.call-rec-pick:hover { background: var(--brand-soft); }
+.call-audio { width: 100%; max-width: 300px; height: 36px; }

@@ -44,6 +44,8 @@ class LeadCommunicationController extends Controller
         return response()->json(['ok' => true, 'message' => 'Saved.']);
     }
 
+    public const AUDIO = ['mp3', 'm4a', 'amr', 'wav', 'aac', 'ogg', 'oga', 'opus', '3gp', '3gpp', 'webm', 'mp4'];
+
     public function startCall(Request $request, int $lead)
     {
         return response()->json(['id' => $this->comms->startCall($this->lead($request, $lead), $request->user())->id]);
@@ -52,9 +54,16 @@ class LeadCommunicationController extends Controller
     public function endCall(Request $request, int $lead, int $call)
     {
         $lead = $this->lead($request, $lead);
-        $data = $request->validate(['seconds' => ['required', 'integer', 'min:0'], 'note' => ['nullable', 'string', 'max:500']]);
+        $data = $request->validate([
+            'seconds' => ['required', 'integer', 'min:0'],
+            'note' => ['nullable', 'string', 'max:500'],
+            'recording' => ['nullable', 'file', 'max:30720'],   // the phone's call recording (30 MB)
+        ]);
+        $file = $request->file('recording');
+        // Phones save recordings as .m4a / .amr / .mp3 …: checked by extension (their mime types vary)
+        abort_if($file && ! in_array(strtolower($file->getClientOriginalExtension()), self::AUDIO, true), 422, 'Attach an audio file (mp3, m4a, amr, wav, aac, ogg, opus, 3gp).');
         $comm = LeadCommunication::where('lead_id', $lead->id)->where('user_id', $request->user()->id)->where('channel', 'call')->findOrFail($call);
-        $this->comms->endCall($comm, (int) $data['seconds'], $data['note'] ?? null);
+        $this->comms->endCall($comm, (int) $data['seconds'], $data['note'] ?? null, $file);
 
         return response()->json(['ok' => true, 'talk' => gmdate('i:s', min(3599, (int) $data['seconds']))]);
     }

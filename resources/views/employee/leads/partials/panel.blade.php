@@ -24,7 +24,7 @@
         <x-badge :tone="$lead->status->tone()">{{ $lead->status->label($hr) }}</x-badge>
     </div>
     @if ($lead->corrected_at)
-        <div class="corrected-box mb-3"><i class="bi bi-patch-check-fill"></i><div><b>Review & correction by {{ $lead->corrector?->name }}</b><div class="small">{{ $lead->correction_note }}</div><div class="small-xs text-muted">{{ $lead->corrected_at->format('d M, h:i A') }}</div></div></div>
+        <div class="corrected-box mb-3"><i class="bi bi-patch-check-fill"></i><div><b>Review & correction by {{ $lead->corrector?->publicName() }}</b><div class="small">{{ $lead->correction_note }}</div><div class="small-xs text-muted">{{ $lead->corrected_at->format('d M, h:i A') }}</div></div></div>
     @endif
 
     <div class="fw-bold small mb-1">Additional Info</div>

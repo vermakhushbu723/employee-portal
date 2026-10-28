@@ -14,7 +14,7 @@
                 <button type="button" class="btn btn-link p-0 fw-600 text-dark text-decoration-none text-nowrap" data-open-panel>{{ $lead->name }}</button>
                 <div class="small-xs text-muted">+91 {{ $lead->mobile }}</div>
                 @if ($lead->assigned_at && $lead->status === LeadStatus::New)<x-badge tone="info"><i class="bi bi-stars"></i> New Data</x-badge>@endif
-                @if ($lead->corrected_at)<span class="corrected-tag" title="{{ $lead->correction_note }}"><i class="bi bi-patch-check-fill"></i> Review & correction by {{ $lead->corrector?->role->portal() === 'admin' ? 'Admin' : 'Manager' }}</span>@endif
+                @if ($lead->corrected_at)<span class="corrected-tag" title="{{ $lead->correction_note }}"><i class="bi bi-patch-check-fill"></i> Review & correction by {{ $lead->corrector?->role->portal() === 'admin' ? \App\Models\User::MANAGEMENT : 'Manager' }}</span>@endif
             </div>
         </div>
     </td>

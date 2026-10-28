@@ -43,6 +43,23 @@
         <span class="wa-badge"><i class="bi bi-whatsapp"></i></span>
     </a>
     @include('partials.whatsapp-panel')
+
+    {{-- Location mandatory for this ID: nothing can be used until location is allowed (public/js/app.js) --}}
+    @if (auth()->user()?->location_required)
+        <div class="geo-gate d-none" id="geoGate" role="alertdialog" aria-modal="true" aria-labelledby="geoGateTitle">
+            <div class="geo-gate-card">
+                <span class="geo-gate-icon"><i class="bi bi-geo-alt-fill"></i></span>
+                <h5 class="fw-bold mt-3 mb-1" id="geoGateTitle">Location is mandatory</h5>
+                <p class="small text-muted mb-3" data-geo-gate-msg>Your company requires location access to use the portal.</p>
+                <ol class="small text-start mb-3">
+                    <li>Turn on <b>Location / GPS</b> on your phone or computer.</li>
+                    <li>Tap the <b><i class="bi bi-lock-fill"></i> lock icon</b> next to the address (or App info → Permissions) and set <b>Location → Allow</b>.</li>
+                    <li>Tap <b>Try again</b>.</li>
+                </ol>
+                <button type="button" class="btn btn-primary w-100" data-geo-gate-retry><i class="bi bi-arrow-repeat me-1"></i>Try again</button>
+            </div>
+        </div>
+    @endif
     @include('partials.install-banner')
     @include('partials.punch-gate')
     @if (auth()->user()->tracksAttendance())

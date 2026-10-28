@@ -49,10 +49,14 @@ class LeadCommunicationService
         return LeadCommunication::create(['lead_id' => $lead->id, 'user_id' => $user->id, 'channel' => 'call', 'status' => 'started']);
     }
 
-    /** Talk time is measured in the browser (tap Call → back in the portal); capped at 2 hours. */
-    public function endCall(LeadCommunication $call, int $seconds, ?string $note): LeadCommunication
+    /**
+     * Talk time is measured in the browser (tap Call → back in the portal); capped at 2 hours.
+     * The phone's own call recording can be attached; admin / manager play it in the Call Log.
+     */
+    public function endCall(LeadCommunication $call, int $seconds, ?string $note, ?UploadedFile $recording = null): LeadCommunication
     {
-        $call->update(['status' => 'done', 'duration_seconds' => max(0, min(7200, $seconds)), 'body' => $note]);
+        $call->update(['status' => 'done', 'duration_seconds' => max(0, min(7200, $seconds)), 'body' => $note]
+            + ($recording ? ['file_path' => $recording->store('call-recordings/'.$call->lead_id, 'local')] : []));
 
         return $call;
     }

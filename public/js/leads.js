@@ -83,7 +83,11 @@
         if (!call) return;
         const seconds = Math.floor((Date.now() - call.started) / 1000);
         try {
-            const res = await json('POST', url(call.lead, `call/${call.id}`), { seconds, note: e.target.note.value });
+            const body = new FormData();
+            body.append('seconds', seconds);
+            body.append('note', e.target.note.value);
+            if (e.target.recording.files[0]) body.append('recording', e.target.recording.files[0]);
+            const res = await json('POST', url(call.lead, `call/${call.id}`), body, true);
             document.querySelectorAll(`[data-lead="${call.lead}"] [data-talk]`).forEach((el) => { el.textContent = res.talk; });
             toast('Call saved', `Talk time ${fmt(seconds)}`);
         } catch (err) { toast('Call not saved', err.message, true); }
@@ -91,7 +95,11 @@
         call = null;
         try { sessionStorage.removeItem('portal:call'); } catch (err) { /* ignore */ }
         e.target.reset();
+        e.target.querySelector('[data-call-rec-name]').textContent = 'Attach call recording (optional)';
         modal('callEndModal').hide();
+    });
+    document.querySelector('[data-call-rec]')?.addEventListener('change', (e) => {
+        e.target.closest('form').querySelector('[data-call-rec-name]').textContent = e.target.files[0]?.name || 'Attach call recording (optional)';
     });
     // Came back after a page reload during the call
     try {

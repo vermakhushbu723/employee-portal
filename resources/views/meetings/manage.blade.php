@@ -6,7 +6,7 @@
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <div class="flex-grow-1">
         <h1 class="h5 fw-bold mb-0">Meetings</h1>
-        <div class="small text-muted">Customer meetings of {{ $portal === 'admin' ? 'all employees' : 'your team' }}. A meeting you give stays <b>Pending</b> until the employee accepts it.</div>
+        <div class="small text-muted">Customer meetings of {{ $portal === 'admin' ? 'all employees' : 'your team' }}. A meeting you give stays <b>Pending</b> until the employee accepts it. Meetings never close by themselves — <b>Review</b> closes, re-opens or reschedules them.</div>
     </div>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignModal"><i class="bi bi-plus-lg me-1"></i>Give Meeting</button>
 </div>
@@ -17,7 +17,7 @@
     </div>
 @endif
 <nav class="seg-tabs mb-3">
-    @foreach (['today' => 'Today', 'upcoming' => 'Upcoming', 'pending' => 'Pending Acceptance', 'past' => 'Past'] as $key => $label)
+    @foreach (['today' => 'Today', 'review' => 'Needs Review', 'upcoming' => 'Upcoming', 'pending' => 'Pending Acceptance', 'past' => 'Closed'] as $key => $label)
         <a href="{{ route($portal.'.meetings.index', ['tab' => $key]) }}" @class(['active' => $tab === $key])>{{ $label }} ({{ $counts[$key] }})</a>
     @endforeach
 </nav>
@@ -30,7 +30,7 @@
                 @forelse ($meetings as $m)
                     @php [$label, $tone] = $m->badge(); $seeContact = $people->canSeeContact(auth()->user(), $m); $om = $m->outcomeMeta(); @endphp
                     <tr>
-                        <td class="text-nowrap"><b>{{ $m->scheduled_at->format('d M Y') }}</b><div class="small text-muted">{{ $m->scheduled_at->format('h:i A') }}</div></td>
+                        <td class="text-nowrap"><b>{{ $m->scheduled_at->format('d M Y') }}</b><div class="small text-muted">{{ $m->timeRange() }}</div></td>
                         <td>
                             {{ $m->customer_name }}
                             <div class="small-xs text-muted">{{ $seeContact ? $m->customer_mobile : \App\Services\MeetingPeopleService::mask($m->customer_mobile) }} {{ $m->city ? '· '.$m->city : '' }}</div>
@@ -46,12 +46,12 @@
                         <td class="small">@forelse ($m->participants as $p)<div class="text-nowrap">{{ $p->name }}@if ($p->pivot->role === 'primary') <x-badge tone="primary">Primary</x-badge>@endif</div>@empty <span class="text-muted">—</span> @endforelse</td>
                         <td class="small text-nowrap"><i class="bi bi-{{ $m->platformIcon() }}"></i> {{ $m->platformLabel() }}</td>
                         <td>
-                            @if ($om)
-                                <x-badge :tone="$om[1]"><i class="bi bi-{{ $om[2] }}"></i> {{ $om[0] }}</x-badge>
-                                <div class="small-xs text-muted">{{ $m->durationLabel() ? 'Duration '.$m->durationLabel() : '' }}{{ $m->outcome_note ? ' · '.$m->outcome_note : '' }}</div>
-                            @else
-                                <x-badge :tone="$tone">{{ $label }}</x-badge>@if ($m->status === 'live' && $m->started_at)<div class="small-xs text-muted">since {{ $m->started_at->format('h:i A') }}</div>@endif
-                            @endif
+                            <x-badge :tone="$tone">{{ $label }}</x-badge>
+                            @if ($m->status === 'live' && $m->started_at && $m->hasPeopleInRoom())<div class="small-xs text-muted">since {{ $m->started_at->format('h:i A') }}</div>@endif
+                            @if ($om)<div><x-badge :tone="$om[1]"><i class="bi bi-{{ $om[2] }}"></i> {{ $om[0] }}</x-badge></div>@endif
+                            @if ($tm = $m->tagMeta())<div><x-badge :tone="$tm[1]"><i class="bi bi-{{ $tm[2] }}"></i> {{ $tm[0] }}</x-badge></div>@endif
+                            @if ($m->durationLabel() || $m->outcome_note)<div class="small-xs text-muted">{{ $m->durationLabel() ? 'Connected '.$m->durationLabel() : '' }}{{ $m->outcome_note ? ' · '.$m->outcome_note : '' }}</div>@endif
+                            @if ($m->reviewer)<div class="small-xs text-muted">Reviewed by {{ $m->reviewer->name }}</div>@endif
                             @if ($m->notified)<div class="small-xs text-muted"><i class="bi bi-send"></i> {{ collect($m->notified)->where('ok', true)->count() }}/{{ count($m->notified) }} invites</div>@endif
                         </td>
                         <td class="text-end text-nowrap">
@@ -63,13 +63,17 @@
                                     <a href="{{ $m->link }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Join</a>
                                 @endif
                             @endif
+                            @if (in_array($m->status, ['upcoming', 'live', 'completed'], true))
+                                @php $reviewFill = ['title_text' => $m->title.' — '.$m->customer_name, 'action' => $m->status === 'completed' ? 'open' : 'close', 'outcome' => $m->outcome, 'tag' => $m->tag, 'outcome_note' => $m->outcome_note, 'date' => $m->scheduled_at->toDateString(), 'time' => $m->scheduled_at->format('H:i'), 'end_time' => $m->endsAt()->format('H:i')]; @endphp
+                                <button type="button" @class(['btn btn-sm', 'btn-warning' => $m->needsReview(), 'btn-light' => ! $m->needsReview()]) data-modal="#meetingReviewModal" data-action="{{ route($portal.'.meetings.review', $m) }}" data-fill='@json($reviewFill)'><i class="bi bi-clipboard-check"></i> Review</button>
+                            @endif
                             @if (in_array($m->status, ['pending', 'upcoming'], true))
                                 <form method="POST" action="{{ route($portal.'.meetings.cancel', $m) }}" class="d-inline" data-confirm="Cancel this meeting?">@csrf<button class="btn btn-sm btn-outline-danger">Cancel</button></form>
                             @endif
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7"><x-empty-state icon="calendar-event" title="No meetings here" /></td></tr>
+                    <tr><td colspan="8"><x-empty-state icon="calendar-event" title="No meetings here" /></td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -104,7 +108,8 @@
                     </select>
                 </div>
                 <div class="col-md-4"><label class="form-label required">Date</label><input type="date" name="date" class="form-control" min="{{ today()->toDateString() }}" value="{{ old('date', today()->toDateString()) }}" required></div>
-                <div class="col-md-4"><label class="form-label required">Time</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required></div>
+                <div class="col-6 col-md-2"><label class="form-label required">From</label><input type="time" name="time" class="form-control" value="{{ old('time') }}" required data-from-time></div>
+                <div class="col-6 col-md-2"><label class="form-label required">To</label><input type="time" name="end_time" class="form-control" value="{{ old('end_time') }}" required data-to-time></div>
                 <div class="col-12"><label class="form-label">Meeting link <span class="small text-muted fw-normal">(only for Google Meet / Zoom / Teams — Portal Meeting joins inside the dashboard)</span></label><input type="url" name="link" class="form-control" value="{{ old('link') }}" placeholder="https://meet.google.com/…"></div>
                 <div class="col-12"><label class="form-label">Notes</label><textarea name="notes" rows="2" class="form-control" maxlength="1000">{{ old('notes') }}</textarea></div>
                 @if ($forLead)<input type="hidden" name="lead_id" value="{{ $forLead->id }}">@endif
@@ -138,6 +143,8 @@
         </form>
     </div>
 </div>
+@include('meetings.partials.review-modal')
+
 @if ($errors->any() && old('customer_name'))
     @push('scripts')<script>bootstrap.Modal.getOrCreateInstance(document.getElementById('assignModal')).show();</script>@endpush
 @endif

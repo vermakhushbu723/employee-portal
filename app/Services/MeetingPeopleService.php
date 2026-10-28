@@ -51,7 +51,7 @@ class MeetingPeopleService
     {
         $results = [];
         $link = $m->joinLink();
-        $text = "Meeting: {$m->title}\nDate & time: {$m->scheduled_at->format('d M Y, h:i A')}\nWith: {$sender->name}".($link ? "\nJoin here: {$link}" : '');
+        $text = "Meeting: {$m->title}\nDate & time: {$m->scheduled_at->format('d M Y, h:i A')}\nWith: {$sender->publicName()}".($link ? "\nJoin here: {$link}" : '');
 
         foreach (array_unique(array_filter($emails, fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL))) as $email) {
             $ok = MailPool::ready() && MailPool::send([$email], new MeetingInvite($m, $sender), "Meeting #{$m->id} invite");
@@ -82,13 +82,6 @@ class MeetingPeopleService
             || $user->id === $m->created_by
             || $user->role->portal() === 'admin'
             || $m->participants->contains(fn ($p) => $p->id === $user->id && $p->pivot->role === 'primary');
-    }
-
-    /** Meetings nobody joined within 2 hours of their time are "Not Connected". */
-    public static function closeMissed(): void
-    {
-        Meeting::where('status', 'upcoming')->whereNull('started_at')->where('scheduled_at', '<', now()->subHours(2))
-            ->update(['status' => 'completed', 'outcome' => 'not_connected', 'duration_seconds' => 0, 'updated_at' => now()]);
     }
 
     public static function mask(?string $value): string

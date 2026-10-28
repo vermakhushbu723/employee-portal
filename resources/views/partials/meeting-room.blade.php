@@ -1,6 +1,7 @@
 {{--
     Built-in video meeting room (public/js/meeting-room.js).
-    $m = Meeting, $api = MeetingRoomController::api(), $endForm = optional route to end the meeting (host),
+    $m = Meeting, $api = MeetingRoomController::api(), $reviewAction = optional review route (admin / manager / TL:
+    close / keep open / reschedule — the only way a meeting closes),
     $backUrl = where "Leave" goes, $askName = customer must type a name first.
 --}}
 @php
@@ -90,32 +91,14 @@
             @endif
             <button type="button" class="ctrl" data-fullscreen><i class="bi bi-arrows-fullscreen"></i><span>Full Screen</span></button>
             <button type="button" class="ctrl end" data-leave><i class="bi bi-telephone-x-fill"></i><span>Leave</span></button>
-            @isset($endForm)
-                <button type="button" class="ctrl end" data-bs-toggle="modal" data-bs-target="#endMeetingModal"><i class="bi bi-x-octagon-fill"></i><span>End Meeting</span></button>
+            @isset($reviewAction)
+                <button type="button" class="ctrl end" data-bs-toggle="modal" data-bs-target="#meetingReviewModal"><i class="bi bi-clipboard-check"></i><span>Review / Close</span></button>
             @endisset
         </div>
     </div>
 
-    @isset($endForm)
-        <div class="modal fade" id="endMeetingModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <form method="POST" action="{{ $endForm }}" class="modal-content rounded-4 border-0 text-dark" data-end-form>
-                    @csrf
-                    <div class="modal-header border-0"><h5 class="modal-title fw-bold">End meeting — how did it go?</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                    <div class="modal-body pt-0">
-                        <div class="outcome-pick">
-                            @foreach (\App\Services\MeetingPeopleService::OUTCOMES as $key => [$olabel, $otone, $oicon])
-                                <label class="outcome-opt tone-{{ $otone }}"><input type="radio" name="outcome" value="{{ $key }}" @checked($key === 'success')><span><i class="bi bi-{{ $oicon }}"></i> {{ $olabel }}</span></label>
-                            @endforeach
-                        </div>
-                        <label class="form-label small mt-3">Note (optional)</label>
-                        <input type="text" name="outcome_note" maxlength="500" class="form-control" placeholder="e.g. Customer agreed to apply">
-                        <div class="small-xs text-muted mt-2">Duration is saved automatically from when the meeting started.</div>
-                    </div>
-                    <div class="modal-footer border-0"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-danger">End for everyone</button></div>
-                </form>
-            </div>
-        </div>
+    @isset($reviewAction)
+        @include('meetings.partials.review-modal', ['action' => $reviewAction, 'm' => $m])
     @endisset
 
     {{-- After leaving --}}

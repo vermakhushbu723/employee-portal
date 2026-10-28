@@ -30,11 +30,16 @@ class MeetingRoomController extends Controller
     {
         $m = $this->meeting($request, $key);
         $user = $request->user();
-        $name = $user ? $user->name.($user->id === $m->user_id ? '' : ' ('.$user->roleLabel().')') : (string) $request->validate(['name' => ['required', 'string', 'max:60']])['name'];
+        $name = match (true) {
+            ! $user => (string) $request->validate(['name' => ['required', 'string', 'max:60']])['name'],
+            $user->role->portal() === 'admin' => \App\Models\User::MANAGEMENT,
+            $user->id === $m->user_id => $user->name,
+            default => $user->name.' ('.$user->roleLabel().')',
+        };
 
-        // The employee joining their own meeting = "In Meeting" on the dashboards
-        if ($user && $user->id === $m->user_id && $m->status === 'upcoming') {
-            Meeting::where('user_id', $m->user_id)->where('status', 'live')->whereKeyNot($m->id)->update(['status' => 'completed', 'ended_at' => now()]);
+        // First person in the room starts the meeting. Other meetings are never closed by this:
+        // only admin / manager / TL close a meeting, in its review.
+        if ($m->status === 'upcoming') {
             $m->update(['status' => 'live', 'started_at' => $m->started_at ?? now()]);
         }
 

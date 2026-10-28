@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A customer meeting on Google Meet / Zoom / Teams.
+ * A customer meeting (built-in Portal Meeting, Google Meet / Zoom / Teams).
  *   pending   — given by admin/manager, waiting for the employee to accept
- *   upcoming  — booked / accepted
- *   live      — employee joined (shows "In Meeting" on the dashboards)
- *   completed | declined | cancelled
+ *   upcoming  — booked / accepted (or re-opened / rescheduled after a review)
+ *   live      — started; stays open after everyone leaves until admin / manager / TL reviews it
+ *   completed — closed by admin / manager / TL in the review (never automatically)
+ *   declined | cancelled
  */
 class Meeting extends Model
 {
@@ -24,10 +25,20 @@ class Meeting extends Model
         'other' => ['Other', 'link-45deg', null],
     ];
 
+    /** Next step marked in the review: [label, tone, icon, lead status it sets]. */
+    public const TAGS = [
+        'interested' => ['Interested', 'success', 'hand-thumbs-up-fill', 'interested'],
+        'follow_up' => ['Follow Up', 'info', 'arrow-repeat', 'follow_up'],
+        'hire' => ['Hire', 'success', 'person-check-fill', 'converted'],
+        'lead_closed' => ['Lead Closed', 'primary', 'trophy-fill', 'converted'],
+        'irrelevant' => ['Irrelevant', 'secondary', 'slash-circle', 'not_interested'],
+        'fake_lead' => ['Fake Lead', 'danger', 'exclamation-octagon-fill', 'invalid'],
+    ];
+
     protected $fillable = [
         'user_id', 'created_by', 'lead_id', 'customer_name', 'customer_mobile', 'city', 'title',
-        'platform', 'link', 'scheduled_at', 'notes', 'status', 'started_at', 'ended_at', 'room_token',
-        'outcome', 'outcome_note', 'duration_seconds', 'notified',
+        'platform', 'link', 'scheduled_at', 'ends_at', 'notes', 'status', 'started_at', 'ended_at', 'room_token',
+        'outcome', 'outcome_note', 'duration_seconds', 'notified', 'tag', 'reviewed_by', 'reviewed_at',
     ];
 
     protected static function booted(): void
@@ -54,7 +65,7 @@ class Meeting extends Model
 
     protected function casts(): array
     {
-        return ['scheduled_at' => 'datetime', 'started_at' => 'datetime', 'ended_at' => 'datetime', 'notified' => 'array'];
+        return ['scheduled_at' => 'datetime', 'ends_at' => 'datetime', 'started_at' => 'datetime', 'ended_at' => 'datetime', 'reviewed_at' => 'datetime', 'notified' => 'array'];
     }
 
     public function user(): BelongsTo
@@ -71,6 +82,58 @@ class Meeting extends Model
     public function participants(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(User::class, 'meeting_participants')->withPivot('role')->withTimestamps();
+    }
+
+    public function peers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(MeetingPeer::class);
+    }
+
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /** Planned end (meetings booked before "to time" existed: 30 minutes). */
+    public function endsAt(): \Illuminate\Support\Carbon
+    {
+        return $this->ends_at ?? $this->scheduled_at->copy()->addMinutes(30);
+    }
+
+    /** "03:10 PM – 03:40 PM" */
+    public function timeRange(): string
+    {
+        return $this->scheduled_at->format('h:i A').' – '.$this->endsAt()->format('h:i A');
+    }
+
+    /** Somebody is in the built-in room right now. */
+    public function hasPeopleInRoom(): bool
+    {
+        if (isset($this->attributes['in_room_count'])) {
+            return $this->attributes['in_room_count'] > 0;
+        }
+
+        return $this->peers()->whereNull('left_at')
+            ->where('last_seen_at', '>=', now()->subSeconds(\App\Services\MeetingRoomService::PEER_TIMEOUT))->exists();
+    }
+
+    /** Started (or its time is over) and still open: admin / manager / TL must close, re-open or reschedule it. */
+    public function needsReview(): bool
+    {
+        return ($this->status === 'live' && ! $this->hasPeopleInRoom())
+            || ($this->status === 'upcoming' && $this->endsAt()->isPast());
+    }
+
+    public function tagMeta(): ?array
+    {
+        return $this->tag ? (self::TAGS[$this->tag] ?? null) : null;
+    }
+
+    /** Adds in_room_count (people in the built-in room now) to a meeting query. */
+    public function scopeWithRoomCount(Builder $q): Builder
+    {
+        return $q->withCount(['peers as in_room_count' => fn ($p) => $p->whereNull('left_at')
+            ->where('last_seen_at', '>=', now()->subSeconds(\App\Services\MeetingRoomService::PEER_TIMEOUT))]);
     }
 
     public function primaryManager(): ?User
@@ -115,7 +178,10 @@ class Meeting extends Model
     /** [label, tone] for the status badge. */
     public function badge(): array
     {
-        if ($this->status === 'upcoming' && $this->scheduled_at->lte(now()) && $this->scheduled_at->gt(now()->subHour())) {
+        if ($this->needsReview()) {
+            return [$this->status === 'live' ? 'Awaiting Review' : 'Time Over · Review', 'warning'];
+        }
+        if ($this->status === 'upcoming' && $this->scheduled_at->lte(now())) {
             return ['Starting Now', 'success'];
         }
 

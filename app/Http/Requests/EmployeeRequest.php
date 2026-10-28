@@ -47,6 +47,7 @@ class EmployeeRequest extends FormRequest
             'custom_hours' => ['nullable'],   // calculated from start / end / break (see shiftMinutes)
             'no_training' => ['nullable', 'boolean'],
             'features_sent' => ['nullable', 'boolean'],
+            'location_required' => ['nullable', 'in:0,1'],
             'features' => ['nullable', 'array'],
             'features.*' => [Rule::in(array_keys(\App\Models\User::FEATURES))],
             'target_calls' => ['nullable', 'integer', 'min:0', 'max:2000'],

@@ -56,7 +56,7 @@
                             'break' => $session ? $session->break_minutes.' min' : '—',
                             'worked' => $session ? Duration::hm((int) $session->active_seconds).' active' : '—',
                             'leads' => $session ? "{$session->leads_created} created · {$session->interested_count} interested" : '—',
-                            'note' => $day['leave'] ? $day['leave']->leave_type->label().' — '.$day['leave']->reason : ($session?->correction_note ? 'Admin note: '.$session->correction_note : ''),
+                            'note' => $day['leave'] ? $day['leave']->leave_type->label().' — '.$day['leave']->reason : ($session?->correction_note ? 'Our Management Team note: '.$session->correction_note : ''),
                         ];
                         $clickable = $status !== null && $status !== AttendanceStatus::WeeklyOff;
                         $tone = $level !== null ? $gradeTone : $status?->tone();

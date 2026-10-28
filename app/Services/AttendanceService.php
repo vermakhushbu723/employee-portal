@@ -299,7 +299,7 @@ class AttendanceService
                 'created_by' => $admin->id,
                 'type' => $approve ? 'general' : 'alert',
                 'title' => $approve ? 'Late Check-in Approved' : 'Late Check-in Rejected',
-                'body' => $approve ? 'Admin approved your late check-in. You can check in now.' : 'Your late check-in request was rejected'.($reason ? ": {$reason}" : '.'),
+                'body' => $approve ? \App\Models\User::MANAGEMENT.' approved your late check-in. You can check in now.' : 'Your late check-in request was rejected'.($reason ? ": {$reason}" : '.'),
             ]);
 
             $this->audit->log($approve ? 'attendance.late_approve' : 'attendance.late_reject', ($approve ? 'Approved' : 'Rejected')." late check-in of {$request->user->employee_code}", ['request_id' => $request->id], $admin);
@@ -487,7 +487,7 @@ class AttendanceService
                 'worked_minutes' => intdiv($timer['worked'], 60),
                 'break_minutes' => intdiv($timer['break_used'], 60),
                 'checkout_type' => 'admin',
-                'checkout_reason' => "Punched out by {$admin->name}",
+                'checkout_reason' => 'Punched out by '.$admin->publicName(),
             ])->save();
 
             $this->score->finalize($session);

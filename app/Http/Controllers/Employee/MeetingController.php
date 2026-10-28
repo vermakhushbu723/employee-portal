@@ -12,28 +12,28 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
-/** Employee: Meeting Schedule — book, accept / decline, join (In Meeting), end. */
+/** Employee: Meeting Schedule — book, accept / decline, join. Admin / manager / TL close meetings (review). */
 class MeetingController extends Controller
 {
     public function index(Request $request)
     {
         $user = $request->user();
-        MeetingPeopleService::closeMissed();
         $tab = in_array($request->query('tab'), ['upcoming', 'past', 'requests'], true) ? $request->query('tab') : 'upcoming';
 
         $mine = fn () => Meeting::where('user_id', $user->id);
         $scopes = [
-            'upcoming' => fn ($q) => $q->whereIn('status', ['upcoming', 'live'])->where('scheduled_at', '>=', now()->subHours(2))->orderBy('scheduled_at'),
+            // Open meetings stay here (also after their time) until admin / manager / TL closes them
+            'upcoming' => fn ($q) => $q->whereIn('status', ['upcoming', 'live'])->orderBy('scheduled_at'),
             'requests' => fn ($q) => $q->where('status', 'pending')->orderBy('scheduled_at'),
-            'past' => fn ($q) => $q->where(fn ($q) => $q->whereIn('status', ['completed', 'declined', 'cancelled'])
-                ->orWhere(fn ($q) => $q->where('status', 'upcoming')->where('scheduled_at', '<', now()->subHours(2))))->latest('scheduled_at'),
+            'past' => fn ($q) => $q->whereIn('status', ['completed', 'declined', 'cancelled'])->latest('scheduled_at'),
         ];
 
         return view('employee.meetings.index', [
             'tab' => $tab,
             'counts' => collect($scopes)->map(fn ($s) => $s($mine())->count()),
-            'meetings' => $scopes[$tab]($mine())->with('creator', 'participants')->paginate(15)->withQueryString(),
-            'live' => $mine()->where('status', 'live')->first(),
+            'meetings' => $scopes[$tab]($mine())->withRoomCount()->with('creator', 'participants')->paginate(15)->withQueryString(),
+            'live' => $mine()->where('status', 'live')->withRoomCount()->get()->first(fn ($m) => $m->hasPeopleInRoom()),
+            'tags' => Meeting::TAGS,
             'leads' => Lead::ownedBy($user)->whereIn('status', ['interested', 'follow_up', 'new', 'converted'])->orderByDesc('updated_at')->limit(200)->get(['id', 'name', 'mobile', 'city', 'email']),
             'platforms' => Meeting::PLATFORMS,
             'managers' => MeetingPeopleService::managers(),
@@ -59,6 +59,7 @@ class MeetingController extends Controller
             'platform' => $data['platform'],
             'link' => $data['link'] ?? null,
             'scheduled_at' => Carbon::parse($data['date'].' '.$data['time']),
+            'ends_at' => self::endsAt($data),
             'notes' => $data['notes'] ?? null,
             'status' => 'upcoming',
         ]);
@@ -87,8 +88,9 @@ class MeetingController extends Controller
             'link' => ['nullable', 'url', 'max:500'],
             'date' => ['required', 'date', 'after_or_equal:today'],
             'time' => ['required', 'date_format:H:i'],
+            'end_time' => ['nullable', 'date_format:H:i'],
         ]);
-        $m->update(['link' => $data['link'] ?? null, 'scheduled_at' => Carbon::parse($data['date'].' '.$data['time'])]);
+        $m->update(['link' => $data['link'] ?? null, 'scheduled_at' => Carbon::parse($data['date'].' '.$data['time']), 'ends_at' => self::endsAt($data)]);
 
         return back()->with('success', 'Meeting updated.');
     }
@@ -111,14 +113,12 @@ class MeetingController extends Controller
         return back()->with('success', 'Meeting request declined.');
     }
 
-    /** Join: marks the meeting live (dashboards show "In Meeting") and opens the meeting room. */
+    /** Join: marks the meeting live and opens the meeting room. Other meetings stay open (only a review closes them). */
     public function join(Request $request, int $meeting)
     {
         $m = $this->find($request, $meeting);
         abort_unless(in_array($m->status, ['upcoming', 'live'], true), 422, 'This meeting cannot be joined.');
 
-        // Only one live meeting at a time
-        Meeting::where('user_id', $m->user_id)->where('status', 'live')->whereKeyNot($m->id)->update(['status' => 'completed', 'ended_at' => now()]);
         if ($m->status !== 'live') {
             $m->update(['status' => 'live', 'started_at' => now()]);
         }
@@ -134,26 +134,6 @@ class MeetingController extends Controller
             'm' => $m,
             'next' => Meeting::where('user_id', $m->user_id)->whereIn('status', ['upcoming'])->where('scheduled_at', '>', now())->orderBy('scheduled_at')->first(),
         ]);
-    }
-
-    public function end(Request $request, int $meeting)
-    {
-        $m = $this->find($request, $meeting);
-        $data = $request->validate([
-            'outcome' => ['nullable', Rule::in(array_keys(MeetingPeopleService::OUTCOMES))],
-            'outcome_note' => ['nullable', 'string', 'max:500'],
-        ]);
-        $started = $m->started_at;
-        $m->update([
-            'status' => 'completed',
-            'ended_at' => now(),
-            'started_at' => $started ?? now(),
-            'duration_seconds' => $started ? $started->diffInSeconds(now(), true) : 0,
-            'outcome' => $data['outcome'] ?? ($started ? 'success' : 'not_connected'),
-            'outcome_note' => $data['outcome_note'] ?? null,
-        ]);
-
-        return redirect()->route('employee.meetings.index')->with('success', 'Meeting ended — '.MeetingPeopleService::OUTCOMES[$m->outcome][0].', duration '.$m->durationLabel().'.');
     }
 
     private function find(Request $request, int $id): Meeting
@@ -173,6 +153,7 @@ class MeetingController extends Controller
             'link' => ['nullable', 'url', 'max:500'],
             'date' => ['required', 'date', 'after_or_equal:today'],
             'time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'primary_manager_id' => ['nullable', 'integer', 'exists:users,id'],
             'managers' => ['nullable', 'array'],
@@ -180,6 +161,18 @@ class MeetingController extends Controller
             'notify_emails' => ['nullable', 'string', 'max:1000'],
             'notify_numbers' => ['nullable', 'string', 'max:500'],
         ], ['customer_name.required_without' => 'Choose a lead or type the customer name.']);
+    }
+
+    /** "To time" of the booking form; a to-time earlier than the from-time is the next day. Default 30 minutes. */
+    public static function endsAt(array $data): Carbon
+    {
+        $start = Carbon::parse($data['date'].' '.$data['time']);
+        if (empty($data['end_time'])) {
+            return $start->copy()->addMinutes(30);
+        }
+        $end = Carbon::parse($data['date'].' '.$data['end_time']);
+
+        return $end->lte($start) ? $end->addDay() : $end;
     }
 
     /** "a@x.com, b@y.com" / numbers on new lines → list */

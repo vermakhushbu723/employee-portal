@@ -8,7 +8,6 @@
     {{-- Built-in room: the call happens right here in the dashboard --}}
     @include('partials.meeting-room', [
         'api' => \App\Http\Controllers\MeetingRoomController::api($m, false),
-        'endForm' => in_array($m->status, ['live', 'upcoming'], true) ? route('employee.meetings.end', $m) : null,
         'backUrl' => route('employee.meetings.index'),
     ])
 @else
@@ -43,9 +42,7 @@
                 @if ($next)
                     <form method="POST" action="{{ route('employee.meetings.join', $next) }}" class="d-inline">@csrf<button class="ctrl" title="{{ $next->title }} · {{ $next->scheduled_at->format('h:i A') }}"><i class="bi bi-skip-end"></i><span>Next Meeting</span></button></form>
                 @endif
-                @if (in_array($m->status, ['live', 'upcoming'], true))
-                    <form method="POST" action="{{ route('employee.meetings.end', $m) }}" class="d-inline" data-confirm="End this meeting?">@csrf<button class="ctrl end"><i class="bi bi-telephone-x-fill"></i><span>End Meeting</span></button></form>
-                @endif
+                <a href="{{ route('employee.meetings.index') }}" class="ctrl end" title="The meeting stays open — management closes it after review"><i class="bi bi-telephone-x-fill"></i><span>Leave</span></a>
             </div>
         </div>
     </div>
@@ -60,7 +57,7 @@
                 <dt>Date & Time</dt><dd>{{ $m->scheduled_at->format('d M Y | h:i A') }}</dd>
                 <dt>Meeting Link</dt><dd class="text-break">@if ($m->link)<a href="{{ $m->link }}" target="_blank" rel="noopener">{{ $m->link }}</a>@else — @endif</dd>
                 <dt>Customer</dt><dd>{{ $m->customer_name }}@if ($m->customer_mobile) · {{ $m->customer_mobile }}@endif @if ($m->city)· {{ $m->city }}@endif</dd>
-                @if ($m->creator && $m->creator->id !== $m->user_id)<dt>Given by</dt><dd>{{ $m->creator->name }}</dd>@endif
+                @if ($m->creator && $m->creator->id !== $m->user_id)<dt>Given by</dt><dd>{{ $m->creator->publicName() }}</dd>@endif
                 @if ($m->notes)<dt>Notes</dt><dd>{!! nl2br(e($m->notes)) !!}</dd>@endif
             </dl>
         </div>

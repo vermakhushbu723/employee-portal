@@ -8,6 +8,7 @@
     'm' => $m,
     'api' => \App\Http\Controllers\MeetingRoomController::api($m, false),
     'backUrl' => route($portal.'.meetings.index'),
+    'reviewAction' => in_array($m->status, ['upcoming', 'live'], true) ? route($portal.'.meetings.review', $m) : null,
 ])
 @endsection
 

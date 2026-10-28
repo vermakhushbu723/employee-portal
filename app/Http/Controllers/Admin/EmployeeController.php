@@ -51,6 +51,7 @@ class EmployeeController extends Controller
                 'custom_role_id' => $request->resolvedRole()[1],
                 'password' => $data['password'],
                 'features' => $request->features(),
+                'location_required' => $request->boolean('location_required'),
             ]);
 
             $user->employee()->create($request->profileData());
@@ -88,6 +89,7 @@ class EmployeeController extends Controller
                 'role' => $request->resolvedRole()[0],
                 'custom_role_id' => $request->resolvedRole()[1],
                 'features' => $request->features(),
+                'location_required' => $request->boolean('location_required'),
             ]);
 
             if (! empty($data['password'])) {

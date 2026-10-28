@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class User extends Authenticatable
 {
     protected $fillable = [
-        'employee_code', 'name', 'email', 'mobile', 'role', 'custom_role_id', 'status', 'password', 'last_login_at', 'features',
+        'employee_code', 'name', 'email', 'mobile', 'role', 'custom_role_id', 'status', 'password', 'last_login_at', 'features', 'location_required',
     ];
 
     /** Employee sections admin can also give a manager / team leader (and take from an employee). */
@@ -21,6 +21,9 @@ class User extends Authenticatable
         'leads' => ['My Leads', 'people', 'Own leads list, calls, WhatsApp / email, status'],
         'meetings' => ['Meetings', 'camera-video', 'Book and join customer meetings'],
     ];
+
+    /** How admins appear to employees (notifications, work cards, meetings). */
+    public const MANAGEMENT = 'Our Management Team';
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -37,6 +40,7 @@ class User extends Authenticatable
             'longitude' => 'float',
             'location_at' => 'datetime',
             'device_at' => 'datetime',
+            'location_required' => 'boolean',
         ];
     }
 
@@ -114,6 +118,12 @@ class User extends Authenticatable
     public function teamMembers(): Builder
     {
         return static::query()->whereHas('employee', fn (Builder $q) => $q->where('manager_id', $this->id));
+    }
+
+    /** Name employees see for an action: admins show as "Our Management Team". */
+    public function publicName(): string
+    {
+        return $this->role->portal() === 'admin' ? self::MANAGEMENT : $this->name;
     }
 
     /** Employees have every section unless admin removed one; managers / team leaders only the ticked ones. */
