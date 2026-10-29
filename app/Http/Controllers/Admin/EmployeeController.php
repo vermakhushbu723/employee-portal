@@ -129,10 +129,13 @@ class EmployeeController extends Controller
     {
         return [
             'roles' => Role::cases(),
-            'departments' => Department::orderBy('name')->get(),
+            // Business departments only (the ones data is uploaded for) + the employee's current one
+            'departments' => Department::forData()->get()
+                ->when($editing?->employee?->department_id, fn ($list, $id) => $list->contains('id', $id) ? $list : $list->push(Department::find($id))->filter()),
             'shifts' => Shift::where('is_custom', false)->orWhere('id', $editing?->employee?->shift_id)->orderBy('start_time')->get(),
             'customRoles' => \App\Models\CustomRole::orderBy('name')->get(),
-            'managers' => User::whereIn('role', [Role::Manager->value, Role::TeamLeader->value])
+            'managers' => User::with('employee.department')->whereIn('role', [Role::Manager->value, Role::TeamLeader->value])
+                ->where('status', 'active')
                 ->when($editing, fn ($q) => $q->whereKeyNot($editing->id))
                 ->orderBy('name')->get(),
         ];

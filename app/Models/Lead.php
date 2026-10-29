@@ -11,6 +11,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lead extends Model
 {
+    /**
+     * Next Action (review page): a next step with a date / time, or a final result that also sets the
+     * lead's status. [label, status it sets | null]
+     */
+    public const NEXT_ACTIONS = [
+        'call' => ['Call Back', null],
+        'meeting' => ['Meeting', null],
+        'visit' => ['Site Visit', null],
+        'document' => ['Document', null],
+        'converted' => ['Converted', 'converted'],
+        'rejected' => ['Rejected', 'rejected'],
+        'invalid' => ['Invalid', 'invalid'],
+        'fake_lead' => ['Fake Lead', 'invalid'],
+        'irrelevant' => ['Irrelevant', 'not_interested'],
+        'not_attend' => ['User Not Attend', 'call_not_answer'],
+    ];
+
     protected $fillable = [
         'batch_id', 'share_id', 'created_by', 'assigned_to', 'assigned_by', 'assigned_at', 'name', 'mobile', 'alternate_mobile', 'email', 'state', 'city',
         'source', 'interest', 'remarks', 'extra', 'status', 'follow_up_date', 'converted_at', 'created_at',
@@ -59,13 +76,19 @@ class Lead extends Model
     /** Value of an uploaded column (e.g. "Age"), case-insensitive. */
     public function field(string $name): ?string
     {
-        foreach ((array) $this->extra as $k => $v) {
+        foreach ($this->extraFields() as $k => $v) {
             if (strcasecmp(trim($k), $name) === 0) {
                 return (string) $v;
             }
         }
 
         return null;
+    }
+
+    /** Uploaded columns for display (Excel day numbers in date columns shown as dates). */
+    public function extraFields(): array
+    {
+        return \App\Support\ExcelDate::fields((array) $this->extra);
     }
 
     public function latestActivity(): \Illuminate\Database\Eloquent\Relations\HasOne

@@ -54,9 +54,9 @@
                                 <div class="small-xs text-muted text-end">{{ $p['called_pct'] }}%</div>
                             </div>
                             <div class="col-6">
-                                <div class="d-flex justify-content-between small"><span>Interested</span><b>{{ $p['interested'] }} / {{ $t->interested_target ?: '—' }}</b></div>
+                                <div class="d-flex justify-content-between small"><span>Interested</span><b>{{ $p['interested'] }} / {{ $p['target'] ?: '—' }}</b></div>
                                 <x-progress class="mt-1" :value="$p['interested_pct']" tone="warning" />
-                                <div class="small-xs text-muted text-end">{{ $t->interested_target ? $p['interested_pct'].'%' : 'No target' }}</div>
+                                <div class="small-xs text-muted text-end">{{ $p['target'] ? $p['interested_pct'].'%' : 'No target' }}</div>
                             </div>
                         </div>
                         <div class="row g-2 mb-3">

@@ -61,6 +61,18 @@ class User extends Authenticatable
         return $this->hasMany(Meeting::class);
     }
 
+    /** E-mail IDs connected in My Profile (OTP verified). */
+    public function emails(): HasMany
+    {
+        return $this->hasMany(UserEmail::class)->orderByDesc('is_primary')->orderBy('id');
+    }
+
+    /** Address customers reply to: the primary verified profile e-mail, else the account e-mail. */
+    public function replyEmail(): ?string
+    {
+        return $this->emails()->whereNotNull('verified_at')->value('email') ?? $this->email;
+    }
+
     public function locationLogs(): HasMany
     {
         return $this->hasMany(LocationLog::class);

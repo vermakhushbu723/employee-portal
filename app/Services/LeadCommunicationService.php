@@ -21,7 +21,12 @@ class LeadCommunicationService
     /** Fill {Name} {Date} {Time} {Employee} {Company} {Purpose}. */
     public static function fill(string $text, Lead $lead, User $user): string
     {
-        $next = $lead->next_action_at;
+        // Next meeting of this lead, else its next action time
+        $next = $lead->meetings()->whereIn('status', ['pending', 'upcoming', 'live'])->where('scheduled_at', '>=', now()->subHour())->orderBy('scheduled_at')->value('scheduled_at');
+        $next = $next ? \Illuminate\Support\Carbon::parse($next) : $lead->next_action_at;
+        if (! $next) {
+            $text = str_replace([' at {Time}', ' ({Time})', '{Time}'], '', $text);   // no time known: no "at ." left behind
+        }
 
         return strtr($text, [
             '{Name}' => $lead->name,
@@ -81,7 +86,10 @@ class LeadCommunicationService
     public function email(Lead $lead, User $user, string $to, string $subject, string $body, ?UploadedFile $file): LeadCommunication
     {
         $path = $file?->store('lead-files/'.$lead->id, 'local');
-        $ok = MailPool::ready() && MailPool::send([$to], new LeadEmail($subject, $body, $user, $path ? storage_path('app/private/'.$path) : null, $file?->getClientOriginalName()), "Lead #{$lead->id} e-mail");
+        $ok = MailPool::ready() && MailPool::send([$to], new LeadEmail($subject, $body, $user, $path ? storage_path('app/private/'.$path) : null, $file?->getClientOriginalName(), $user->replyEmail()), "Lead #{$lead->id} e-mail");
+        if ($ok && ! $lead->email) {
+            $lead->update(['email' => $to]);   // typed for a lead without e-mail: kept for next time
+        }
 
         return LeadCommunication::create([
             'lead_id' => $lead->id, 'user_id' => $user->id, 'channel' => 'email', 'status' => $ok ? 'sent' : 'failed',

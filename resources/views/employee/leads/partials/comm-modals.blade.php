@@ -25,8 +25,23 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pt-1">
+                @php $replyTo = auth()->user()->replyEmail(); @endphp
+                {{-- How e-mail works: sent by the portal's company mailbox, replies come to the employee's own e-mail ID --}}
+                <div class="mail-help mb-2">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <div>
+                        <b>Sent from:</b> {{ config('portal.company') }} company e-mail (the portal sends it — nothing to set up).<br>
+                        <b>Customer replies go to:</b>
+                        @if ($replyTo)<b class="text-success">{{ $replyTo }}</b> · <a href="{{ route('profile.show') }}#my-emails">change</a>
+                        @else<span class="text-danger">not set</span> — <a href="{{ route('profile.show') }}#my-emails">connect your e-mail ID in My Profile</a> (a code is sent to confirm it).@endif
+                    </div>
+                </div>
                 <div class="row g-2">
-                    <div class="col-12"><label class="form-label small">To</label><input type="email" name="to" class="form-control form-control-sm" required></div>
+                    <div class="col-12">
+                        <label class="form-label small">To <span class="text-muted">(customer's e-mail)</span></label>
+                        <input type="email" name="to" class="form-control form-control-sm" required placeholder="customer@gmail.com">
+                        <div class="small-xs text-muted" data-email-noaddr hidden>This lead has no e-mail saved — type it here; it is saved to the lead after sending.</div>
+                    </div>
                     <div class="col-12"><label class="form-label small">Title</label><select class="form-select form-select-sm" data-email-templates><option value="">— Choose a template —</option></select></div>
                     <div class="col-12"><label class="form-label small">Subject</label><input name="subject" class="form-control form-control-sm" required maxlength="200"></div>
                     <div class="col-12"><label class="form-label small">Message</label><textarea name="body" rows="7" class="form-control form-control-sm" required></textarea></div>

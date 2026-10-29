@@ -108,9 +108,9 @@ class LeadController extends Controller
 
         $data = $request->validate([
             'status' => ['required', Rule::enum(LeadStatus::class)],
-            'follow_up_date' => ['nullable', 'required_if:status,follow_up', 'date', 'after_or_equal:today'],
+            'follow_up_date' => ['nullable', 'required_if:status,follow_up,callback', 'date', 'after_or_equal:today'],
             'note' => ['nullable', 'string', 'max:500'],
-        ], ['follow_up_date.required_if' => 'Please pick a follow-up date.']);
+        ], ['follow_up_date.required_if' => 'Pick the date and time to connect next.']);
 
         $this->leads->updateStatus($lead, $request->user(), LeadStatus::from($data['status']), $data['follow_up_date'] ?? null, $data['note'] ?? null);
 

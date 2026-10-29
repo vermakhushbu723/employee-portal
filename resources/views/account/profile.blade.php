@@ -39,6 +39,49 @@
     </div>
 
     <div class="col-lg-7">
+        {{-- My E-mail IDs: connect up to 4, each confirmed with a code sent to it --}}
+        <div class="card-soft card-pad mb-3" id="my-emails">
+            <div class="section-head">
+                <h3 class="section-title mb-0"><i class="bi bi-envelope-at me-1"></i>My E-mail IDs</h3>
+                <span class="small text-muted">{{ $emails->count() }} / {{ \App\Models\UserEmail::MAX_PER_USER }}</span>
+            </div>
+            <div class="small text-muted mb-2">Connect your own e-mail IDs (up to {{ \App\Models\UserEmail::MAX_PER_USER }}). We send a 6-digit code to confirm each one. Your <b>primary</b> ID is used as <b>Reply-to</b> on e-mails you send to customers, so their answers come to you.</div>
+            @if ($errors->has('email') || $errors->has('otp'))<div class="alert alert-danger small py-2 mb-2">{{ $errors->first('email') ?: $errors->first('otp') }}</div>@endif
+            @foreach ($emails as $em)
+                <div class="email-row">
+                    <i class="bi bi-envelope{{ $em->isVerified() ? '-check-fill text-success' : ' text-muted' }}"></i>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-600 text-truncate">{{ $em->email }}</div>
+                        <div class="small-xs">
+                            @if ($em->isVerified())<span class="text-success">Verified</span>@if ($em->is_primary) · <x-badge tone="primary">Primary</x-badge>@endif
+                            @else<span class="text-warning">Waiting for code</span>@endif
+                        </div>
+                    </div>
+                    @if ($em->isVerified() && ! $em->is_primary)
+                        <form method="POST" action="{{ route('profile.emails.primary', $em) }}">@csrf<button class="btn btn-sm btn-light">Make primary</button></form>
+                    @endif
+                    <form method="POST" action="{{ route('profile.emails.destroy', $em) }}" data-confirm="Remove {{ $em->email }}?">@csrf @method('DELETE')<button class="btn btn-sm btn-light text-danger" aria-label="Remove {{ $em->email }}"><i class="bi bi-trash"></i></button></form>
+                </div>
+                @unless ($em->isVerified())
+                    <div class="email-otp">
+                        <form method="POST" action="{{ route('profile.emails.verify', $em) }}" class="d-flex gap-2 flex-grow-1">
+                            @csrf
+                            <input name="code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" class="form-control form-control-sm otp-input" placeholder="6-digit code" required @if (session('otp_for') === $em->id) autofocus @endif>
+                            <button class="btn btn-sm btn-success">Verify</button>
+                        </form>
+                        <form method="POST" action="{{ route('profile.emails.resend', $em) }}">@csrf<button class="btn btn-sm btn-link px-1">Send new code</button></form>
+                    </div>
+                @endunless
+            @endforeach
+            @if ($emails->count() < \App\Models\UserEmail::MAX_PER_USER)
+                <form method="POST" action="{{ route('profile.emails.store') }}" class="d-flex gap-2 mt-2">
+                    @csrf
+                    <input type="email" name="email" class="form-control" placeholder="yourname@gmail.com" required maxlength="150" value="{{ old('email') }}">
+                    <button class="btn btn-primary text-nowrap"><i class="bi bi-send me-1"></i>Send code</button>
+                </form>
+            @endif
+        </div>
+
         <div class="card-soft card-pad mb-3">
             <div class="section-head">
                 <h3 class="section-title">Announcements & Alerts</h3>

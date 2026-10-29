@@ -78,7 +78,7 @@ class LeadReviewController extends Controller
             'purpose' => ['sometimes', 'nullable', 'string', 'max:150'],
             'status' => ['sometimes', Rule::enum(LeadStatus::class)],
             'next_action_at' => ['sometimes', 'nullable', 'date'],
-            'next_action_type' => ['sometimes', 'nullable', 'in:call,meeting,visit,document'],
+            'next_action_type' => ['sometimes', 'nullable', Rule::in(array_keys(Lead::NEXT_ACTIONS))],
             'remarks' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
@@ -89,6 +89,8 @@ class LeadReviewController extends Controller
             'ok' => true,
             'message' => $result['changed'] ? "{$lead->name}: ".implode('; ', $result['changed']).($result['score'] ? ' — employee score updated.' : '') : 'Nothing changed.',
             'score' => $result['score'],
+            'status' => $lead->fresh()->status->value,
+            'status_label' => $lead->fresh()->status->label($lead->isHr()),
         ]);
     }
 }

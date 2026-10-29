@@ -77,6 +77,21 @@ enum LeadStatus: string
         return [self::Interested->value, self::Converted->value];
     }
 
+    /** Not offered in the employee's status list (meetings are booked from Meetings; "Call Not Answer" covers no pick-up). */
+    public const HIDDEN_FOR_EMPLOYEE = ['meeting', 'call_not_pick'];
+
+    /** Review page: final results are marked in Next Action instead (Converted / Rejected / Invalid …). */
+    public const HIDDEN_IN_REVIEW = ['meeting', 'call_not_pick', 'rejected', 'converted', 'invalid'];
+
+    /** Statuses that ask "when to connect next" (date + time). */
+    public const NEEDS_NEXT_TIME = ['follow_up', 'callback'];
+
+    /** Options for a status dropdown; the lead's current status is always kept so it still shows. */
+    public static function choosable(array $hide, ?self $current = null): array
+    {
+        return array_values(array_filter(self::cases(), fn ($s) => ! in_array($s->value, $hide, true) || $s === $current));
+    }
+
     /** Statuses an employee can choose (a call was made). */
     public static function workable(): array
     {

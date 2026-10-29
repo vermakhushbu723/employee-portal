@@ -18,7 +18,7 @@
         'Email' => $lead->email,
         'City' => trim(($lead->city ?? '').($lead->state ? ', '.$lead->state : ''), ', '),
     ]);
-    foreach ((array) $lead->extra as $k => $v) {
+    foreach ($lead->extraFields() as $k => $v) {
         if ($v !== null && $v !== '' && ! in_array(strtolower($k), ['name', 'mobile', 'city', 'email', 'state'], true)) { $details[$k] = $v; }
     }
 @endphp
@@ -55,10 +55,10 @@
                     <dd>
                         <form class="lead-status d-inline-block" data-inline-status action="{{ route('employee.leads.status', $lead) }}">
                             <select name="status" class="form-select form-select-sm status-select tone-{{ $lead->status->tone() }}">
-                                @foreach (LeadStatus::cases() as $s)<option value="{{ $s->value }}" @selected($lead->status === $s)>{{ $s->label($hr) }}</option>@endforeach
+                                @foreach (LeadStatus::choosable(LeadStatus::HIDDEN_FOR_EMPLOYEE, $lead->status) as $s)<option value="{{ $s->value }}" @selected($lead->status === $s)>{{ $s->label($hr) }}</option>@endforeach
                             </select>
                             <div class="follow-up-pick d-none mt-1">
-                                <input type="date" name="follow_up_date" min="{{ today()->toDateString() }}" class="form-control form-control-sm"><button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                <input type="datetime-local" name="follow_up_date" min="{{ now()->format('Y-m-d\TH:i') }}" class="form-control form-control-sm" aria-label="Next connect date and time" title="Next connect — date & time"><button type="submit" class="btn btn-sm btn-primary">Save</button>
                             </div>
                         </form>
                     </dd>

@@ -21,11 +21,16 @@ class LeadEmail extends Mailable
         public User $sender,
         public ?string $filePath = null,
         public ?string $fileName = null,
+        public ?string $replyAddress = null,
     ) {}
 
+    /** Sent from the company mailbox; the customer's reply goes to the employee's own e-mail ID. */
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->mailSubject);
+        return new Envelope(
+            subject: $this->mailSubject,
+            replyTo: $this->replyAddress ? [new \Illuminate\Mail\Mailables\Address($this->replyAddress, $this->sender->publicName())] : [],
+        );
     }
 
     public function content(): Content

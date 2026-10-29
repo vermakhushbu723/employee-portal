@@ -6,13 +6,16 @@
     const base = table.dataset.updateUrl.replace(/\/0$/, '');
     const csrf = () => document.querySelector('meta[name=csrf-token]')?.content;
     const POSITIVE = ['interested', 'converted'];
+    // Next Action results that also change the status (Lead::NEXT_ACTIONS)
+    const RESULT = JSON.parse(table.dataset.nextResults || '{}');
 
     const save = async (input) => {
         const row = input.closest('tr[data-lead]');
         const field = input.dataset.field;
         const body = { [field]: input.value };
 
-        if (field === 'status' && POSITIVE.includes(row.dataset.status) && !POSITIVE.includes(input.value)) {
+        const newStatus = field === 'status' ? input.value : (field === 'next_action_type' ? RESULT[input.value] : null);
+        if (newStatus && POSITIVE.includes(row.dataset.status) && !POSITIVE.includes(newStatus)) {
             const note = prompt(`${row.dataset.name}: why is this not ${row.dataset.status.replace('_', ' ')}? (the employee will see this, and their score goes down)`);
             if (note === null) { input.value = row.dataset.status; return; }
             body.note = note;
@@ -28,9 +31,15 @@
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.message || 'Not saved');
-            if (field === 'status') {
-                row.dataset.status = input.value;
-                input.className = input.className.replace(/tone-\S+/, '');
+            if (data.status && data.status !== row.dataset.status) {
+                // Status changed (here or by a Next Action result): show it in the status dropdown
+                row.dataset.status = data.status;
+                const sel = row.querySelector('select[data-field="status"]');
+                if (sel) {
+                    if (![...sel.options].some((o) => o.value === data.status)) sel.add(new Option(data.status_label, data.status));
+                    sel.value = data.status;
+                    sel.className = sel.className.replace(/tone-\S+/, '');
+                }
             }
             input.classList.add('saved');
             setTimeout(() => input.classList.remove('saved'), 1200);

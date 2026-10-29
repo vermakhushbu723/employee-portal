@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Announcement extends Model
 {
-    protected $fillable = ['user_id', 'created_by', 'type', 'title', 'body', 'published_at'];
+    protected $fillable = ['user_id', 'created_by', 'type', 'title', 'body', 'published_at', 'share_id'];
 
     protected function casts(): array
     {

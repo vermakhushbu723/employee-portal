@@ -78,7 +78,7 @@
         <div class="row g-3">
             <div class="col-md-6">
                 <label class="form-label">Department</label>
-                <select name="department_id" class="form-select">
+                <select name="department_id" class="form-select" data-dept-select>
                     <option value="">—</option>
                     @foreach ($departments as $department)
                         <option value="{{ $department->id }}" @selected(old('department_id', $emp?->department_id) == $department->id)>{{ $department->name }}</option>
@@ -91,12 +91,13 @@
             </div>
             <div class="col-md-6">
                 <label class="form-label">Reporting Manager</label>
-                <select name="manager_id" class="form-select @error('manager_id') is-invalid @enderror">
+                <select name="manager_id" class="form-select @error('manager_id') is-invalid @enderror" data-manager-select>
                     <option value="">—</option>
                     @foreach ($managers as $manager)
-                        <option value="{{ $manager->id }}" @selected(old('manager_id', $emp?->manager_id) == $manager->id)>{{ $manager->name }} ({{ $manager->role->label() }})</option>
+                        <option value="{{ $manager->id }}" data-dept="{{ $manager->employee?->department_id }}" @selected(old('manager_id', $emp?->manager_id) == $manager->id)>{{ $manager->name }} ({{ $manager->role->label() }}){{ $manager->employee?->department ? ' · '.$manager->employee->department->name : '' }}</option>
                     @endforeach
                 </select>
+                <div class="small-xs text-muted mt-1" data-manager-hint>Managers / team leaders of the selected department.</div>
                 @error('manager_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">

@@ -19,6 +19,7 @@ class ProfileController extends Controller
             'user' => $user,
             'shift' => $user->currentShift(),
             'announcements' => $announcements,
+            'emails' => $user->emails()->get(),
         ]);
     }
 

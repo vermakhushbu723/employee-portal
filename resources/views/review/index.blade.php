@@ -75,7 +75,8 @@
     @endforeach
 </div>
 
-<div class="card-soft" id="reviewTable" data-update-url="{{ route($portal.'.review.update', 0) }}">
+@php $nextResults = collect(\App\Models\Lead::NEXT_ACTIONS)->map(fn ($a) => $a[1])->filter(); @endphp
+<div class="card-soft" id="reviewTable" data-update-url="{{ route($portal.'.review.update', 0) }}" data-next-results='@json($nextResults)'>
     <div class="table-responsive">
         <table class="table table-soft align-middle review-table mb-0">
             <thead>
@@ -120,14 +121,19 @@
                         <td><input class="form-control form-control-sm rv-input" data-field="purpose" value="{{ $lead->purpose ?? $lead->interest }}" maxlength="150" placeholder="Purpose…"></td>
                         <td>
                             <select class="form-select form-select-sm rv-input rv-status tone-{{ $lead->status->tone() }}" data-field="status">
-                                @foreach (LeadStatus::cases() as $s)<option value="{{ $s->value }}" @selected($lead->status === $s)>{{ $s->label($lhr) }}</option>@endforeach
+                                @foreach (LeadStatus::choosable(LeadStatus::HIDDEN_IN_REVIEW, $lead->status) as $s)<option value="{{ $s->value }}" @selected($lead->status === $s)>{{ $s->label($lhr) }}</option>@endforeach
                             </select>
                         </td>
                         <td>
                             <div class="d-flex gap-1">
-                                <select class="form-select form-select-sm rv-input" data-field="next_action_type" style="width:96px">
+                                <select class="form-select form-select-sm rv-input" data-field="next_action_type" style="width:118px" title="Next step, or the final result of this lead">
                                     <option value="">—</option>
-                                    @foreach (['call' => 'Call Back', 'meeting' => $lhr ? 'Interview' : 'Meeting', 'visit' => 'Site Visit', 'document' => 'Document'] as $k => $l)<option value="{{ $k }}" @selected($lead->next_action_type === $k)>{{ $l }}</option>@endforeach
+                                    <optgroup label="Next step">
+                                        @foreach (\App\Models\Lead::NEXT_ACTIONS as $k => [$l, $res])@if (! $res)<option value="{{ $k }}" @selected($lead->next_action_type === $k)>{{ $k === 'meeting' && $lhr ? 'Interview' : $l }}</option>@endif @endforeach
+                                    </optgroup>
+                                    <optgroup label="Mark result">
+                                        @foreach (\App\Models\Lead::NEXT_ACTIONS as $k => [$l, $res])@if ($res)<option value="{{ $k }}" @selected($lead->next_action_type === $k)>{{ $l }}</option>@endif @endforeach
+                                    </optgroup>
                                 </select>
                                 <input type="datetime-local" class="form-control form-control-sm rv-input" data-field="next_action_at" value="{{ $lead->next_action_at?->format('Y-m-d\TH:i') }}">
                             </div>

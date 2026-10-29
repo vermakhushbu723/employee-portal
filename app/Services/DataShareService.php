@@ -145,7 +145,13 @@ class DataShareService
 
             foreach (WorkAssignment::where('share_id', $share->id)->get() as $task) {
                 $left = Lead::where('share_id', $share->id)->where('assigned_to', $task->user_id)->count();
-                $left === 0 ? $task->delete() : $task->update(['total_records' => $left]);
+                if ($left === 0) {
+                    $task->delete();
+                    $this->notices($share, $task->user_id)->delete();   // the "New Calling Data Assigned" message goes too
+                } else {
+                    $task->update(['total_records' => $left, 'interested_target' => min($task->interested_target, $left)]);
+                    $this->notices($share, $task->user_id)->update(['body' => self::noticeBody($task->fresh())]);
+                }
             }
 
             $share->update(['rolled_back_at' => now(), 'rolled_back_by' => $admin->id, 'rolled_back_count' => $returned]);
@@ -158,15 +164,50 @@ class DataShareService
             Announcement::create([
                 'user_id' => $userId,
                 'created_by' => $admin->id,
-                'type' => 'important',
+                'type' => 'general',
                 'title' => 'Shared Data Taken Back',
-                'body' => "{$n} un-called lead(s) from {$file} were taken back by admin (shared by mistake). Leads you already called stay with you.",
+                'body' => "{$n} un-called lead(s) from {$file} were taken back by ".\App\Models\User::MANAGEMENT.'. Leads you already called stay with you.',
             ]);
         }
 
         $this->audit->log('data.rollback', "Rolled back share #{$share->id}: {$returned} un-called lead(s) returned to the pool", ['share_id' => $share->id, 'per_user' => $perUser], $admin);
 
         return $returned;
+    }
+
+    /**
+     * Edit a share after sending it: work message, interested target, manager. The employees'
+     * calling tasks and their "New Calling Data Assigned" messages are updated to match.
+     */
+    public function update(User $admin, DataShare $share, ?string $message, int $interestedTarget, ?int $managerId): void
+    {
+        if ($share->rolled_back_at) {
+            throw ValidationException::withMessages(['share' => 'This share was rolled back and cannot be edited.']);
+        }
+        DB::transaction(function () use ($share, $message, $interestedTarget, $managerId) {
+            $share->update(['message' => $message, 'interested_target' => $interestedTarget, 'manager_id' => $managerId]);
+            foreach (WorkAssignment::where('share_id', $share->id)->get() as $task) {
+                $task->update(['message' => $message, 'interested_target' => min($interestedTarget, (int) $task->total_records)]);
+                $this->notices($share, $task->user_id)->update(['body' => self::noticeBody($task->fresh())]);
+            }
+        });
+        $this->audit->log('data.share_edit', "Edited share #{$share->id}", ['share_id' => $share->id, 'message' => $message, 'target' => $interestedTarget, 'manager_id' => $managerId], $admin);
+    }
+
+    /** "New Calling Data Assigned" messages of a share for one employee (older ones are matched by time). */
+    private function notices(DataShare $share, int $userId): Builder
+    {
+        return Announcement::query()->where('user_id', $userId)->where('title', 'New Calling Data Assigned')
+            ->where(fn ($q) => $q->where('share_id', $share->id)
+                ->orWhere(fn ($q) => $q->whereNull('share_id')->whereBetween('created_at', [$share->created_at->copy()->subMinute(), $share->created_at->copy()->addMinutes(10)])));
+    }
+
+    public static function noticeBody(WorkAssignment $task): string
+    {
+        return "File: {$task->title} · {$task->total_records} lead(s) to call"
+            .($task->interested_target ? " · Target: {$task->interested_target} interested" : '')
+            .($task->message ? "\nWork: {$task->message}" : '')
+            ."\nOpen My Assigned Work → Start Calling.";
     }
 
     /** Take back leads the employee has not worked on yet (status still "new"). */

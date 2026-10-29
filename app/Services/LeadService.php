@@ -38,12 +38,15 @@ class LeadService
     public function updateStatus(Lead $lead, User $user, LeadStatus $status, ?string $followUpDate, ?string $note): void
     {
         $from = $lead->status;
+        // "When to connect next": date + time (a date alone means 10:00 AM)
+        $next = $followUpDate && in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true)
+            ? \Illuminate\Support\Carbon::parse(strlen($followUpDate) <= 10 ? $followUpDate.' 10:00' : $followUpDate) : null;
 
         $lead->update([
             'status' => $status,
-            'follow_up_date' => in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true) && $followUpDate ? $followUpDate : $lead->follow_up_date,
-            'next_action_at' => in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true) && $followUpDate ? $followUpDate.' 10:00:00' : $lead->next_action_at,
-            'next_action_type' => in_array($status, [LeadStatus::FollowUp, LeadStatus::Callback], true) && $followUpDate ? 'call' : $lead->next_action_type,
+            'follow_up_date' => $next ? $next->toDateString() : $lead->follow_up_date,
+            'next_action_at' => $next ?? $lead->next_action_at,
+            'next_action_type' => $next ? 'call' : $lead->next_action_type,
             'converted_at' => $status === LeadStatus::Converted ? ($lead->converted_at ?? now()) : null,
         ]);
 

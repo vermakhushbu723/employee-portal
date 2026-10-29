@@ -31,6 +31,8 @@ class WorkAssignmentService
     public function createCalling(User $by, LeadBatch $batch, array $given, ?string $message, int $interestedTarget, ?int $shareId = null): void
     {
         foreach ($given as $userId => $count) {
+            // Never more interested than the records given (19 records → at most 19 interested)
+            $target = min($interestedTarget, $count);
             WorkAssignment::create([
                 'user_id' => $userId,
                 'assigned_by' => $by->id,
@@ -40,17 +42,18 @@ class WorkAssignmentService
                 'title' => $batch->file_name ?: $batch->name,
                 'message' => $message,
                 'total_records' => $count,
-                'interested_target' => $interestedTarget,
+                'interested_target' => $target,
                 'assigned_at' => now(),
             ]);
 
             Announcement::create([
                 'user_id' => $userId,
+                'share_id' => $shareId,
                 'created_by' => $by->id,
                 'type' => 'important',
                 'title' => 'New Calling Data Assigned',
                 'body' => "File: {$batch->file_name} · {$count} lead(s) to call"
-                    .($interestedTarget ? " · Target: {$interestedTarget} interested" : '')
+                    .($target ? " · Target: {$target} interested" : '')
                     .($message ? "\nWork: {$message}" : '')
                     ."\nOpen My Assigned Work → Start Calling.",
             ]);
@@ -95,15 +98,17 @@ class WorkAssignmentService
             $total = (clone $leads)->count();
             $called = (clone $leads)->where('status', '!=', LeadStatus::New->value)->count();
             $interested = (clone $leads)->whereIn('status', ['interested', 'follow_up', 'converted'])->count();
+            $target = self::target($a, $total);
 
             $p = [
+                'target' => $target,
                 'total' => $total,
                 'called' => $called,
                 'interested' => $interested,
                 'pending_call' => max(0, $total - $called),
-                'pending_interested' => max(0, $a->interested_target - $interested),
+                'pending_interested' => max(0, $target - $interested),
                 'called_pct' => $total ? (int) floor($called / $total * 100) : 0,
-                'interested_pct' => $a->interested_target ? (int) min(100, floor($interested / $a->interested_target * 100)) : 100,
+                'interested_pct' => $target ? (int) min(100, floor($interested / $target * 100)) : 100,
             ];
             $done = $total > 0 && $p['pending_call'] === 0 && $p['pending_interested'] === 0;
         } else {
@@ -125,6 +130,12 @@ class WorkAssignmentService
         return $p + ['done' => $done];
     }
 
+    /** Interested target of a calling task, never above the number of records in it. */
+    public static function target(WorkAssignment $a, ?int $records = null): int
+    {
+        return (int) min($a->interested_target, $records ?? $a->total_records ?? $a->interested_target);
+    }
+
     /** Open tasks plus tasks finished today, with progress — for the dashboard / My Assigned Work. */
     public function cardsFor(User $user): Collection
     {
@@ -143,7 +154,7 @@ class WorkAssignmentService
             ->filter(fn ($a) => ! $this->progress($a)['done']);
 
         return [
-            'interested' => (int) $open->where('type', 'calling')->sum('interested_target'),
+            'interested' => (int) $open->where('type', 'calling')->sum(fn ($a) => self::target($a)),
             'leads' => (int) $open->where('type', 'lead_create')->sum('lead_target'),
         ];
     }

@@ -57,7 +57,7 @@
                         <td class="small text-muted">{{ $lead->id }}</td>
                         @if ($fileColumns)
                             @foreach ($fileColumns as $column)
-                                <td class="small">{{ $lead->extra[$column] ?? '' }}</td>
+                                <td class="small">{{ \App\Support\ExcelDate::format($column, $lead->extra[$column] ?? '') }}</td>
                             @endforeach
                         @else
                             <td class="fw-600">{{ $lead->name }}</td>

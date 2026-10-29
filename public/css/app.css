@@ -914,3 +914,28 @@ body.geo-blocked { overflow: hidden; }
 .call-rec-pick { display: flex; align-items: center; justify-content: center; gap: .4rem; padding: .45rem .6rem; border: 1px dashed var(--line); border-radius: 10px; font-size: .8rem; cursor: pointer; color: var(--brand); }
 .call-rec-pick:hover { background: var(--brand-soft); }
 .call-audio { width: 100%; max-width: 300px; height: 36px; }
+
+/* Lead Details panel: two parts that scroll separately (details on top, activity tabs below) */
+.lead-panel { display: flex; flex-direction: column; overflow: hidden; height: calc(100vh - var(--topbar-h) - 1.5rem); }
+.lead-panel-head { position: static; flex-shrink: 0; }
+.lead-panel-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0; }
+.lp-top { flex: 0 1 auto; max-height: 48%; overflow-y: auto; padding: .9rem 1rem .4rem; border-bottom: 1px solid var(--line); overscroll-behavior: contain; }
+.lp-bottom { flex: 1 1 auto; min-height: 140px; overflow-y: auto; padding: 0 1rem .6rem; overscroll-behavior: contain; }
+.lp-bottom .panel-tabs { position: sticky; top: 0; z-index: 1; background: var(--surface); padding-top: .6rem; }
+.lp-foot { flex-shrink: 0; padding: .6rem 1rem; border-top: 1px solid var(--line); background: var(--surface); }
+.lp-copy { border: 0; background: transparent; padding: 0 .15rem; color: var(--muted); font-size: .75rem; opacity: .55; vertical-align: baseline; }
+.lp-copy:hover { opacity: 1; color: var(--brand); }
+.lead-info dd .lp-copy { visibility: hidden; }
+.lead-info dd:hover .lp-copy, .lead-info dd:focus-within .lp-copy { visibility: visible; }
+@media (hover: none) { .lead-info dd .lp-copy { visibility: visible; } }
+.share-scroll { max-height: 460px; overflow-y: auto; }
+.share-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+
+/* My E-mail IDs (profile) */
+.email-row { display: flex; align-items: center; gap: .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
+.email-row > .bi { font-size: 1.15rem; }
+.email-otp { display: flex; gap: .4rem; align-items: center; padding: 0 0 .6rem 1.75rem; }
+.otp-input { max-width: 140px; letter-spacing: .3em; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.mail-help { display: flex; gap: .5rem; padding: .55rem .7rem; border-radius: 10px; background: var(--brand-soft); font-size: .78rem; line-height: 1.45; }
+.mail-help > .bi { color: var(--brand); font-size: 1rem; }
+.otp-input::placeholder { letter-spacing: normal; font-family: inherit; }

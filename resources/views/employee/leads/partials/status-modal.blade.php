@@ -15,7 +15,7 @@
                 <div class="mb-3">
                     <label class="form-label required">Status</label>
                     <select name="status" class="form-select @error('status') is-invalid @enderror" data-follow-up-toggle="#followUpField">
-                        @foreach (\App\Enums\LeadStatus::cases() as $status)
+                        @foreach (\App\Enums\LeadStatus::choosable(\App\Enums\LeadStatus::HIDDEN_FOR_EMPLOYEE) as $status)
                             <option value="{{ $status->value }}" @selected(old('status', $current ?? '') === $status->value)>{{ $status->label() }}</option>
                         @endforeach
                     </select>
@@ -23,7 +23,7 @@
                 </div>
                 <div class="mb-3" id="followUpField">
                     <label class="form-label required">Follow-up Date</label>
-                    <input type="date" name="follow_up_date" value="{{ old('follow_up_date') }}" min="{{ today()->toDateString() }}" class="form-control @error('follow_up_date') is-invalid @enderror">
+                    <input type="datetime-local" name="follow_up_date" value="{{ old('follow_up_date') }}" min="{{ now()->format('Y-m-d\TH:i') }}" class="form-control @error('follow_up_date') is-invalid @enderror">
                     @error('follow_up_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div>

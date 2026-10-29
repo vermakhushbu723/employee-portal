@@ -24,10 +24,11 @@
     <td>
         <form class="lead-status" data-inline-status action="{{ route('employee.leads.status', $lead) }}">
             <select name="status" class="form-select form-select-sm status-select tone-{{ $lead->status->tone() }}" aria-label="Status of {{ $lead->name }}">
-                @foreach (LeadStatus::cases() as $s)<option value="{{ $s->value }}" @selected($lead->status === $s)>{{ $s->label($hr) }}</option>@endforeach
+                @foreach (LeadStatus::choosable(LeadStatus::HIDDEN_FOR_EMPLOYEE, $lead->status) as $s)<option value="{{ $s->value }}" @selected($lead->status === $s)>{{ $s->label($hr) }}</option>@endforeach
             </select>
             <div class="follow-up-pick d-none">
-                <input type="date" name="follow_up_date" min="{{ today()->toDateString() }}" value="{{ $lead->follow_up_date?->toDateString() }}" class="form-control form-control-sm" aria-label="Date">
+                <label class="small-xs text-muted mb-0">Next connect — date &amp; time</label>
+                <input type="datetime-local" name="follow_up_date" min="{{ now()->format('Y-m-d\TH:i') }}" value="{{ $lead->next_action_at && in_array($lead->status->value, \App\Enums\LeadStatus::NEEDS_NEXT_TIME, true) ? $lead->next_action_at->format('Y-m-d\TH:i') : '' }}" class="form-control form-control-sm" aria-label="Next connect date and time">
                 <button type="submit" class="btn btn-sm btn-primary">Save</button>
             </div>
         </form>

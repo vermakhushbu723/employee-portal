@@ -252,9 +252,9 @@
 <div class="card-soft mb-3" data-live-region="data">
     <div class="card-pad pb-2">
         <h3 class="section-title"><i class="bi bi-clock-history me-1"></i>Recent Data Shares</h3>
-        <div class="small text-muted">Shared to the wrong person? <b>Rollback</b> returns the leads not called yet to the unassigned pool.</div>
+        <div class="small text-muted">Shared to the wrong person? <b>Rollback</b> returns the leads not called yet to the unassigned pool (and removes the message from the employee's portal). <i class="bi bi-pencil"></i> edits the work details / target after sharing.</div>
     </div>
-    <div class="table-responsive">
+    <div class="table-responsive share-scroll">
         <table class="table table-soft align-middle mb-0">
             <thead><tr><th>When</th><th>Data</th><th>Shared To</th><th class="text-end">Leads</th><th class="text-end">Called</th><th>Message</th><th>By</th><th></th></tr></thead>
             <tbody>
@@ -273,11 +273,16 @@
                         <td class="small text-muted" style="max-width:200px">{{ \Illuminate\Support\Str::limit($sh->message, 60) ?: '—' }}@if ($sh->interested_target)<div class="small-xs">Target {{ $sh->interested_target }} interested</div>@endif</td>
                         <td class="small text-nowrap">{{ $sh->sharer?->name }}</td>
                         <td class="text-end text-nowrap">
+                            @unless ($sh->rolled_back_at)
+                                @php $shareFill = ['message' => $sh->message, 'interested_target' => $sh->interested_target, 'manager_id' => $sh->manager_id, 'share_text' => ($sh->batch?->name ?? 'Shared data').' · '.$sh->total.' lead(s)']; @endphp
+                                <button type="button" class="btn btn-sm btn-light me-1" title="Edit work details / target" data-modal="#shareEditModal" data-action="{{ route('admin.data.shares.update', $sh) }}"
+                                        data-fill='@json($shareFill)'><i class="bi bi-pencil"></i></button>
+                            @endunless
                             @if ($sh->rolled_back_at)
                                 <x-badge tone="secondary"><i class="bi bi-arrow-counterclockwise"></i> Rolled back</x-badge>
                                 <div class="small-xs text-muted">{{ $sh->rolled_back_count }} returned · {{ $sh->rolledBackBy?->name }}</div>
                             @elseif ($sh->total > $sh->called_count)
-                                <form method="POST" action="{{ route('admin.data.rollback', $sh) }}" data-confirm="Rollback this share? {{ $sh->total - $sh->called_count }} un-called lead(s) go back to the unassigned pool. Called leads stay with the employees.">
+                                <form method="POST" action="{{ route('admin.data.rollback', $sh) }}" class="d-inline" data-confirm="Rollback this share? {{ $sh->total - $sh->called_count }} un-called lead(s) go back to the unassigned pool. Called leads stay with the employees.">
                                     @csrf
                                     <button class="btn btn-sm btn-outline-danger"><i class="bi bi-arrow-counterclockwise"></i> Rollback</button>
                                 </form>
@@ -291,6 +296,42 @@
                 @endforelse
             </tbody>
         </table>
+    </div>
+</div>
+
+{{-- Edit a share after sending it --}}
+<div class="modal fade" id="shareEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="" class="modal-content rounded-4 border-0">
+            @csrf
+            @method('PATCH')
+            <div class="modal-header border-0">
+                <div><h5 class="modal-title fw-bold mb-0">Edit Shared Data</h5><div class="small text-muted" data-field="share_text"></div></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <label class="form-label">Work details (message to the employees)</label>
+                <textarea name="message" rows="3" maxlength="1000" class="form-control mb-3" placeholder="e.g. Brand promoter — Delhi BDE profile"></textarea>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Interested target</label>
+                        <input type="number" name="interested_target" min="0" max="5000" class="form-control">
+                        <div class="small-xs text-muted">Never more than the leads each employee got.</div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Manager</label>
+                        <select name="manager_id" class="form-select">
+                            <option value="">—</option>
+                            @foreach ($managers as $mg)<option value="{{ $mg->id }}">{{ $mg->name }}</option>@endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save changes</button>
+            </div>
+        </form>
     </div>
 </div>
 

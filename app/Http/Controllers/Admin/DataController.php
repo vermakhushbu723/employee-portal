@@ -188,6 +188,19 @@ class DataController extends Controller
             .($kept > 0 ? " {$kept} already-called lead(s) stay with the employees." : ''));
     }
 
+    /** Edit a share after sending it (pencil in Recent Data Shares). */
+    public function updateShare(Request $request, DataShare $share)
+    {
+        $data = $request->validate([
+            'message' => ['nullable', 'string', 'max:1000'],
+            'interested_target' => ['nullable', 'integer', 'min:0', 'max:5000'],
+            'manager_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+        $this->share->update($request->user(), $share, $data['message'] ?? null, (int) ($data['interested_target'] ?? 0), $data['manager_id'] ?? null);
+
+        return back()->with('success', 'Share updated — the employees see the new work details and target.');
+    }
+
     public function recall(Request $request, User $user)
     {
         $batchId = $request->integer('batch_id') ?: null;

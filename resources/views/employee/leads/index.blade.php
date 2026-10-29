@@ -14,7 +14,11 @@
     $tabList = [['all', 'All Leads', $total, 'primary', 'collection-fill'], ['new', 'New Data', (int) ($counts['new'] ?? 0), 'info', 'stars'], ['today', 'Today Task', $todayCount, 'danger', 'calendar-check-fill']];
     foreach ($statusTabs as $st) {
         $e = LeadStatus::from($st);
-        $tabList[] = [$st, $e->label(), (int) ($counts[$st] ?? 0), $e->tone(), $e->icon()];
+        // Meeting / Call Not Pick are no longer chosen: their tab shows only while old leads still have them
+        if (in_array($st, LeadStatus::HIDDEN_FOR_EMPLOYEE, true) && empty($counts[$st]) && $tab !== $st) {
+            continue;
+        }
+        $tabList[] =[$st, $e->label(), (int) ($counts[$st] ?? 0), $e->tone(), $e->icon()];
     }
     $keep = array_filter(['tab' => $tab, 'batch' => $batch?->id, 'city' => $filters['city'] ?: null, 'source' => $filters['source'] ?: null, 'q' => $filters['search'] ?: null]);
 @endphp

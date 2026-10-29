@@ -188,7 +188,8 @@ class DataImportService
         foreach ($columns as $i => $label) {
             $value = trim((string) ($row[$i] ?? ''));
             if ($value !== '') {
-                $fields[$label] = mb_substr($value, 0, 500);
+                // Excel day numbers in date columns are saved as real dates
+                $fields[$label] = mb_substr((string) \App\Support\ExcelDate::format($label, $value), 0, 500);
             }
         }
 

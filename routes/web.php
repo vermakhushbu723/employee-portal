@@ -53,6 +53,14 @@ Route::middleware('auth')->group(function () {
     Route::get('notifications', [AnnouncementController::class, 'index'])->name('notifications.index');
     Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    // My E-mail IDs (up to 4, each confirmed with an OTP)
+    Route::controller(\App\Http\Controllers\UserEmailController::class)->prefix('profile/emails')->name('profile.emails.')->group(function () {
+        Route::post('/', 'store')->middleware('throttle:6,1')->name('store');
+        Route::post('{email}/verify', 'verify')->middleware('throttle:12,1')->whereNumber('email')->name('verify');
+        Route::post('{email}/resend', 'resend')->middleware('throttle:6,1')->whereNumber('email')->name('resend');
+        Route::post('{email}/primary', 'primary')->whereNumber('email')->name('primary');
+        Route::delete('{email}', 'destroy')->whereNumber('email')->name('destroy');
+    });
 
     // Voice note / e-mail file of a lead (the employee, or admin / their manager)
     Route::get('lead-files/{comm}', [Employee\LeadCommunicationController::class, 'file'])->whereNumber('comm')->name('lead-files.show');
@@ -288,6 +296,7 @@ Route::middleware(['auth', 'role:super_admin,hr'])
             Route::post('lead-task', 'leadTask')->name('lead-task');
             Route::post('recall/{user}', 'recall')->whereNumber('user')->name('recall');
             Route::post('shares/{share}/rollback', 'rollback')->whereNumber('share')->name('rollback');
+            Route::patch('shares/{share}', 'updateShare')->whereNumber('share')->name('shares.update');
             Route::get('batches/{batch}', 'show')->whereNumber('batch')->name('show');
         });
 

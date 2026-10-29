@@ -48,6 +48,10 @@ class LeadReviewService
         $changes = [];
         $from = $lead->status;
         $to = isset($data['status']) ? LeadStatus::from($data['status']) : $from;
+        // A final result chosen in Next Action (Converted / Rejected / Invalid / Fake Lead / Irrelevant / User Not Attend) sets the status
+        if (! isset($data['status']) && ($result = Lead::NEXT_ACTIONS[$data['next_action_type'] ?? ''][1] ?? null)) {
+            $to = LeadStatus::from($result);
+        }
         $labels = ['purpose' => 'Purpose', 'remarks' => 'Remark', 'next_action_at' => 'Next meeting / action', 'next_action_type' => 'Action type'];
 
         return DB::transaction(function () use ($lead, $reviewer, $data, $from, $to, $labels, &$changes) {
@@ -96,7 +100,7 @@ class LeadReviewService
                     'user_id' => $employeeId,
                     'created_by' => $reviewer->id,
                     'type' => $scoreHit ? 'important' : 'general',
-                    'title' => 'Lead reviewed & corrected by '.($reviewer->role->portal() === 'admin' ? 'Admin' : 'Manager'),
+                    'title' => 'Lead reviewed & corrected by '.($reviewer->role->portal() === 'admin' ? \App\Models\User::MANAGEMENT : 'Manager'),
                     'body' => "{$lead->name}: ".implode('; ', $changes).($scoreHit ? "\nThis was not a correct Interested / Converted marking — your work score was updated." : '').($note ? "\nNote: {$note}" : ''),
                 ]);
             }

@@ -154,6 +154,7 @@
         form.reset();
         form.querySelector('[data-attach-name]').textContent = 'Attach File (Resume, Brochure, JD etc.)';
         form.to.value = target.dataset.email || '';
+        form.querySelector('[data-email-noaddr]').hidden = !!form.to.value;
         const sel = form.querySelector('[data-email-templates]');
         sel.innerHTML = '<option value="">— Choose a template —</option>';
         modal('emailModal').show();

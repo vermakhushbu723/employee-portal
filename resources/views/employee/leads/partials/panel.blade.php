@@ -2,23 +2,27 @@
 @php
     $hr = $lead->isHr();
     $info = array_filter(['Email' => $lead->email, 'City' => $lead->city, 'State' => $lead->state, 'Source' => $lead->source, 'Interest' => $lead->interest, 'Department' => $lead->department?->name]);
-    foreach ((array) $lead->extra as $k => $v) {
+    foreach ($lead->extraFields() as $k => $v) {
         if ($v !== null && $v !== '' && ! in_array(strtolower($k), ['name', 'mobile', 'city', 'email'], true)) {
             $info[$k] = $v;
         }
     }
     $next = $lead->meetings->whereIn('status', ['pending', 'upcoming', 'live'])->sortBy('scheduled_at')->first();
+    $copyAll = collect(['Name' => $lead->name, 'Mobile' => '+91 '.$lead->mobile, 'Purpose' => $lead->purpose ?? $lead->interest] + $info + ['Remark' => $lead->remarks])
+        ->filter(fn ($v) => $v !== null && $v !== '')->map(fn ($v, $k) => "{$k}: {$v}")->implode("\n");
 @endphp
 <div class="lead-panel-head">
     <b>Lead Details</b>
     <button type="button" class="btn-close" data-close-panel aria-label="Close"></button>
 </div>
 <div class="lead-panel-body" data-lead="{{ $lead->id }}" data-name="{{ $lead->name }}" data-mobile="{{ $lead->mobile }}" data-email="{{ $lead->email }}">
+  {{-- 1. Lead + details: scrolls on its own --}}
+  <section class="lp-top">
     <div class="d-flex gap-2 align-items-start mb-3">
         <span class="avatar lg tone-{{ $lead->status->tone() }}">{{ $lead->initials }}</span>
         <div class="flex-grow-1 min-w-0">
             <div class="fw-bold">{{ $lead->name }}</div>
-            <div class="small text-muted"><i class="bi bi-telephone"></i> +91 {{ $lead->mobile }}</div>
+            <div class="small text-muted"><i class="bi bi-telephone"></i> +91 {{ $lead->mobile }} <button type="button" class="lp-copy" data-copy="{{ $lead->mobile }}" data-copy-quiet title="Copy mobile"><i class="bi bi-copy"></i></button></div>
             @if ($lead->city)<div class="small text-muted"><i class="bi bi-geo-alt"></i> {{ $lead->city }}</div>@endif
         </div>
         <x-badge :tone="$lead->status->tone()">{{ $lead->status->label($hr) }}</x-badge>
@@ -27,12 +31,19 @@
         <div class="corrected-box mb-3"><i class="bi bi-patch-check-fill"></i><div><b>Review & correction by {{ $lead->corrector?->publicName() }}</b><div class="small">{{ $lead->correction_note }}</div><div class="small-xs text-muted">{{ $lead->corrected_at->format('d M, h:i A') }}</div></div></div>
     @endif
 
-    <div class="fw-bold small mb-1">Additional Info</div>
+    <div class="d-flex align-items-center mb-1">
+        <div class="fw-bold small flex-grow-1">Additional Info</div>
+        <button type="button" class="btn btn-sm btn-light py-0" data-copy="{{ $copyAll }}"><i class="bi bi-copy"></i> Copy all</button>
+    </div>
     <dl class="lead-info">
         <dt>Purpose</dt><dd>{{ $lead->purpose ?? $lead->interest ?? '—' }}</dd>
-        @foreach ($info as $k => $v)<dt>{{ $k }}</dt><dd>{{ $v }}</dd>@endforeach
+        @foreach ($info as $k => $v)<dt>{{ $k }}</dt><dd><span>{{ $v }}</span> <button type="button" class="lp-copy" data-copy="{{ $v }}" data-copy-quiet title="Copy {{ $k }}"><i class="bi bi-copy"></i></button></dd>@endforeach
         @if ($lead->remarks)<dt>Remark</dt><dd>{{ $lead->remarks }}</dd>@endif
     </dl>
+  </section>
+
+  {{-- 2. Activity / WhatsApp / E-mail / Meeting: its own scroll --}}
+  <section class="lp-bottom">
 
     <ul class="nav nav-tabs panel-tabs small mb-2" role="tablist">
         @foreach (['activity' => 'Activity', 'whatsapp' => 'WhatsApp', 'email' => 'Email', 'meeting' => $hr ? 'Interview' : 'Meeting'] as $k => $l)
@@ -94,7 +105,8 @@
         </div>
     @endif
 
-    <div class="d-grid gap-2 mt-3">
-        <a href="{{ route('employee.leads.show', $lead) }}" class="btn btn-outline-primary btn-sm">View More Details <i class="bi bi-chevron-right"></i></a>
+  </section>
+    <div class="lp-foot">
+        <a href="{{ route('employee.leads.show', $lead) }}" class="btn btn-outline-primary btn-sm w-100">View More Details <i class="bi bi-chevron-right"></i></a>
     </div>
 </div>

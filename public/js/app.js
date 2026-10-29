@@ -354,7 +354,7 @@
         if (['follow_up', 'callback'].includes(select.value) && pick) {
             pick.classList.remove('d-none');
             const date = pick.querySelector('input');
-            date.required = select.value === 'follow_up';
+            date.required = true;   // follow-up and callback both need the next date + time
             date.focus();
             return;
         }
@@ -498,6 +498,29 @@
         beat(true);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) { touch(); beat(); } });
         render();
+    }
+
+    /* ------------------------------------------------------------------ Employee form: managers of the chosen department */
+    const deptSelect = document.querySelector('[data-dept-select]');
+    const mgrSelect = document.querySelector('[data-manager-select]');
+    if (deptSelect && mgrSelect) {
+        const all = [...mgrSelect.options].slice(1).map((o) => o.cloneNode(true));
+        const hint = document.querySelector('[data-manager-hint]');
+        const saved = mgrSelect.value;   // the manager already saved stays choosable
+        const filterManagers = () => {
+            const dept = deptSelect.value;
+            const current = mgrSelect.value;
+            let list = dept ? all.filter((o) => o.dataset.dept === dept || (saved && o.value === saved)) : all;
+            const none = dept && !list.some((o) => o.dataset.dept === dept);
+            if (none) list = all;   // no manager in this department yet: everyone can be chosen
+            mgrSelect.querySelectorAll('option:not(:first-child)').forEach((o) => o.remove());
+            list.forEach((o) => mgrSelect.appendChild(o.cloneNode(true)));
+            mgrSelect.value = list.some((o) => o.value === current) ? current : '';
+            if (hint) hint.textContent = !dept ? 'Choose a department to see its managers / team leaders.'
+                : none ? 'No manager / team leader in this department yet — showing everyone.' : `${list.length} manager / team leader(s) of this department.`;
+        };
+        deptSelect.addEventListener('change', filterManagers);
+        filterManagers();
     }
 
     /* ------------------------------------------------------------------ Meeting from / to time */
@@ -656,13 +679,20 @@
         document.querySelectorAll(`input[type=checkbox][name="${head.dataset.toggleRows}"]`).forEach((b) => { b.checked = head.checked; });
     });
 
-    // Copy-to-clipboard buttons: <button data-copy="text">
-    document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
+    // Copy-to-clipboard: <button data-copy="text"> (also inside content loaded later, e.g. the lead panel).
+    // data-copy-quiet: keep the button's look, show a small toast instead.
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-copy]');
+        if (!btn) return;
+        e.preventDefault();
         try {
             await navigator.clipboard.writeText(btn.dataset.copy);
+            if (btn.hasAttribute('data-copy-quiet')) { window.liveToast?.({ type: 'general', title: 'Copied', body: btn.dataset.copy.slice(0, 80) }); return; }
+            if (btn.dataset.copying) return;
+            btn.dataset.copying = '1';
             const original = btn.innerHTML;
             btn.innerHTML = '<i class="bi bi-check2"></i> Copied';
-            setTimeout(() => { btn.innerHTML = original; }, 2000);
-        } catch (e) { window.prompt('Copy this link:', btn.dataset.copy); }
-    }));
+            setTimeout(() => { btn.innerHTML = original; delete btn.dataset.copying; }, 2000);
+        } catch (err) { window.prompt('Copy this:', btn.dataset.copy); }
+    });
 })();
