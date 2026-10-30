@@ -75,9 +75,13 @@ class LeadCommunicationController extends Controller
         [$comm, $link] = $this->comms->whatsapp($lead, $request->user(), $text);
 
         return response()->json([
-            'ok' => $comm->status === 'sent',
+            'ok' => $comm->status !== 'failed',
             'link' => $link,
-            'message' => $comm->status === 'sent' ? 'WhatsApp sent to '.$lead->name.'.' : 'Your WhatsApp is not linked in the portal — opening WhatsApp to send it.',
+            'message' => match ($comm->status) {
+                'sent' => 'WhatsApp sent to '.$lead->name.'.',
+                'opened' => 'WhatsApp opened with your message for '.$lead->name.' — press Send (Enter) there.',
+                default => 'Your WhatsApp is not linked in the portal — opening WhatsApp to send it.',
+            },
         ]);
     }
 

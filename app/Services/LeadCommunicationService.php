@@ -45,7 +45,11 @@ class LeadCommunicationService
 
         return [
             'whatsapp' => collect($set['whatsapp'])->map(fn ($t) => self::fill($t, $lead, $user))->all(),
-            'email' => collect($set['email'])->map(fn ($t) => ['subject' => self::fill($t[0], $lead, $user), 'body' => self::fill($t[1], $lead, $user)])->all(),
+            'email' => collect($set['email'])->map(fn ($t) => ['subject' => self::fill($t[0], $lead, $user), 'body' => self::fill($t[1], $lead, $user)])
+                ->merge(collect(\App\Models\EmailTemplate::forCompose())->mapWithKeys(fn ($t) => [$t['name'] => [
+                    'subject' => self::fill(str_replace(['{Title}', '{Link}'], [$lead->purpose ?: $lead->interest ?: 'our discussion', ''], $t['subject']), $lead, $user),
+                    'body' => self::fill(preg_replace('/^.*\{Link\}.*$\n?/m', '', str_replace('{Title}', $lead->purpose ?: $lead->interest ?: 'our discussion', $t['body'])), $lead, $user),
+                ]]))->all(),
         ];
     }
 
@@ -69,6 +73,14 @@ class LeadCommunicationService
     /** Sends from the employee's own linked WhatsApp. Returns [communication, fallback wa.me link|null]. */
     public function whatsapp(Lead $lead, User $user, string $text): array
     {
+        $digits = preg_replace('/\D/', '', $lead->mobile);
+        $phone = strlen($digits) === 10 ? '91'.$digits : $digits;
+        // WhatsApp Web mode: the employee's own WhatsApp Web window opens with the chat + message ready
+        if (config('portal.whatsapp.mode') !== 'gateway') {
+            $comm = LeadCommunication::create(['lead_id' => $lead->id, 'user_id' => $user->id, 'channel' => 'whatsapp', 'status' => 'opened', 'body' => $text]);
+
+            return [$comm, 'https://wa.me/'.$phone.'?text='.rawurlencode($text)];
+        }
         $ok = false;
         try {
             $res = $this->wa->call('POST', '/s/'.$this->wa->sid($user).'/send', ['number' => $lead->mobile, 'text' => $text]);

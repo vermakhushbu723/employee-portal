@@ -5,7 +5,7 @@
 @section('content')
 @if (session('wa_links'))
     <div class="alert alert-warning small d-flex flex-wrap align-items-center gap-2">
-        <i class="bi bi-whatsapp"></i> WhatsApp is not linked in the portal, so tap to send these invites from your phone:
+        <i class="bi bi-whatsapp"></i> Tap a number to send the meeting invite from your WhatsApp (opens with the message ready):
         @foreach (session('wa_links') as $w)<a href="{{ $w['link'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-success">+{{ $w['to'] }}</a>@endforeach
     </div>
 @endif
@@ -20,15 +20,34 @@
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <h1 class="h5 fw-bold mb-0 flex-grow-1">Meeting Schedule</h1>
+    <button type="button" class="btn btn-light" data-email-compose='{}'><i class="bi bi-envelope me-1"></i>Send Email</button>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal"><i class="bi bi-plus-lg me-1"></i>Book Meeting</button>
 </div>
 
 <nav class="seg-tabs mb-3">
-    @foreach (['upcoming' => 'Upcoming Meetings', 'requests' => 'Meeting Requests', 'past' => 'Past Meetings'] as $key => $label)
+    @foreach (['upcoming' => 'Upcoming Meetings', 'requests' => 'Meeting Requests', 'past' => 'Past Meetings', 'emails' => 'E-mails Sent'] as $key => $label)
         <a href="{{ route('employee.meetings.index', ['tab' => $key]) }}" @class(['active' => $tab === $key])>{{ $label }} ({{ $counts[$key] }})</a>
     @endforeach
 </nav>
 
+@if ($tab === 'emails')
+<div class="card-soft">
+    @forelse ($emails as $em)
+        <div class="meeting-row">
+            <div class="meeting-when"><div class="fw-bold">{{ $em->created_at->format('d M Y') }}</div><div class="small text-muted">{{ $em->created_at->format('h:i A') }}</div></div>
+            <div class="flex-grow-1 min-w-0">
+                <div class="fw-600 text-truncate">{{ $em->subject }}</div>
+                <div class="small text-muted text-truncate">To {{ $em->to }}@if ($em->meeting) · {{ $em->meeting->title }}@endif</div>
+                <div class="small-xs text-muted text-truncate">{{ \Illuminate\Support\Str::limit($em->body, 140) }}</div>
+            </div>
+            <x-badge :tone="$em->status === 'sent' ? 'success' : 'danger'">{{ $em->status === 'sent' ? 'Sent' : 'Not sent' }}</x-badge>
+        </div>
+    @empty
+        <x-empty-state icon="envelope" title="No e-mails sent yet" text="Use Send Email above, or the envelope button on a meeting." />
+    @endforelse
+    @if ($emails->hasPages())<div class="card-pad pt-2">{{ $emails->links() }}</div>@endif
+</div>
+@else
 <div class="card-soft">
     @forelse ($meetings as $m)
         @php
@@ -37,6 +56,8 @@
                 ? 'https://wa.me/'.preg_replace('/\D/', '', strlen(preg_replace('/\D/', '', $m->customer_mobile)) === 10 ? '91'.$m->customer_mobile : $m->customer_mobile)
                     .'?text='.rawurlencode("Hello {$m->customer_name}, your meeting \"{$m->title}\" is on {$m->scheduled_at->format('d M Y, h:i A')}. Join here: {$m->joinLink()}")
                 : null;
+            $mailTo = $m->lead?->email ?: collect($m->notified ?? [])->firstWhere('channel', 'email')['to'] ?? '';
+            $mailFill = ['to' => $mailTo, 'name' => $m->customer_name, 'title' => $m->title, 'date' => $m->scheduled_at->format('d M Y'), 'time' => $m->scheduled_at->format('h:i A'), 'link' => $m->joinLink(), 'meeting_id' => $m->id];
             $fill = ['title_text' => $m->title.' — '.$m->customer_name, 'link' => $m->link, 'date' => $m->scheduled_at->toDateString(), 'time' => $m->scheduled_at->format('H:i'), 'end_time' => $m->endsAt()->format('H:i')];
         @endphp
         <div class="meeting-row">
@@ -72,6 +93,7 @@
                 @elseif (in_array($m->status, ['upcoming', 'live'], true))
                     <form method="POST" action="{{ route('employee.meetings.join', $m) }}" class="d-inline">@csrf<button class="btn btn-sm btn-success"><i class="bi bi-camera-video"></i> {{ $m->status === 'live' ? 'Return' : 'Join Meeting' }}</button></form>
                     @if ($wa)<a href="{{ $wa }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" title="Send link to customer on WhatsApp"><i class="bi bi-whatsapp"></i></a>@endif
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-email-compose='@json($mailFill)' title="E-mail the customer (invite, reminder, reschedule…)"><i class="bi bi-envelope"></i></button>
                     <button type="button" class="btn btn-sm btn-light" data-modal="#editModal" data-action="{{ route('employee.meetings.update', $m) }}"
                             data-fill='@json($fill)'>
                         {{ $m->link || $m->isPortal() ? 'Reschedule' : 'Add link' }}
@@ -84,6 +106,9 @@
     @endforelse
     @if ($meetings->hasPages())<div class="card-pad pt-2">{{ $meetings->links() }}</div>@endif
 </div>
+@endif
+
+@include('partials.email-compose', ['emailSuggestions' => $emailSuggestions])
 
 {{-- Book a meeting --}}
 <div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">

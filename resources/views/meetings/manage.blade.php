@@ -12,7 +12,7 @@
 </div>
 
 @if (session('wa_links'))
-    <div class="alert alert-warning small d-flex flex-wrap align-items-center gap-2"><i class="bi bi-whatsapp"></i> Your WhatsApp is not linked in the portal — tap to send:
+    <div class="alert alert-warning small d-flex flex-wrap align-items-center gap-2"><i class="bi bi-whatsapp"></i> Tap a number to send the meeting invite from your WhatsApp:
         @foreach (session('wa_links') as $w)<a href="{{ $w['link'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-success">+{{ $w['to'] }}</a>@endforeach
     </div>
 @endif

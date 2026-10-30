@@ -30,7 +30,8 @@ class LeaveController extends Controller
                 ->latest('from_date')
                 ->paginate(10)
                 ->withQueryString(),
-            'balances' => $user->leaveBalances()->where('year', now()->year)->get(),
+            'balances' => tap($user->leaveBalances()->where('year', now()->year), fn () => app(LeaveService::class)->syncAccrued($user))->get(),
+            'leaveRule' => $user->employee?->leave_per_days ? [(float) $user->employee->leave_count, (int) $user->employee->leave_per_days] : null,
             'types' => LeaveType::cases(),
         ]);
     }

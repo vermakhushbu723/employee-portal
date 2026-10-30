@@ -10,7 +10,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class DailyWorkReport extends Mailable
-{
+{S
     use Queueable, SerializesModels;
 
     public function __construct(public AttendanceSession $session, public array $work) {}

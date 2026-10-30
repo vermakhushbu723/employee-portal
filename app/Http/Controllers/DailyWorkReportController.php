@@ -155,7 +155,7 @@ class DailyWorkReportController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['Employee', 'ID', 'Department', 'Manager', 'Punch In', 'Punch Out', 'Shift (actual)', 'Extended till', 'Status', 'Active', 'Inactive', 'Break',
                 'Calls Done', 'Calls Target', 'Leads Created', 'Interested', 'Matured', 'Immatured', 'Meetings Done', 'Meetings', 'Emails Sent', 'WhatsApp Sent',
-                'Progress %', 'Battery %', 'Location', 'Work Score %', 'Attendance', 'Work Status', 'Admin Note'], ',', '"', '');
+                'Progress %', 'Battery %', 'Location', 'Work Score %', 'Attendance Weekly %', 'Attendance Monthly %', 'Score Avg Weekly %', 'Score Avg Monthly %', 'Attendance', 'Work Status', 'Admin Note'], ',', '"', '');
             foreach ($rows as $r) {
                 $s = $r['session'];
                 $w = $r['work'];
@@ -170,7 +170,7 @@ class DailyWorkReportController extends Controller
                     $r['calls'], $r['calls_target'], $w['created'] ?? 0, $w['interested'] ?? 0, $r['matured'], $r['immatured'],
                     $r['meetings_done'], $r['meetings_total'], $r['emails'], $r['whatsapp'], $r['progress'],
                     $u->battery_level, $u->location_status === 'denied' ? 'Off' : ($u->latitude ? 'On' : ''),
-                    $w['score'] ?? 0, $s ? $label : 'Absent', str_replace('_', ' ', $r['work_status']), $s?->correction_note,
+                    $w['score'] ?? 0, $r['avg']['week_att'] ?? '', $r['avg']['month_att'] ?? '', $r['avg']['week_score'] ?? '', $r['avg']['month_score'] ?? '', $s ? $label : 'Absent', str_replace('_', ' ', $r['work_status']), $s?->correction_note,
                 ], ',', '"', '');
             }
             fclose($out);

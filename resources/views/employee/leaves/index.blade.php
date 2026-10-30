@@ -65,6 +65,9 @@
                 <h3 class="section-title">Leave Balance ({{ now()->year }})</h3>
                 <a href="{{ route('employee.leaves.charges') }}" class="small fw-600">Summary</a>
             </div>
+            @if ($leaveRule)
+                <div class="info-box small mb-3"><i class="bi bi-calendar-plus"></i><div>Your leave rule: <b>{{ rtrim(rtrim(number_format($leaveRule[0], 1), '0'), '.') }} leave(s) for every {{ $leaveRule[1] }} working days</b>. Earned Leave grows as you work.</div></div>
+            @endif
             @forelse ($balances as $balance)
                 <div class="mb-3">
                     <div class="d-flex justify-content-between small mb-1">

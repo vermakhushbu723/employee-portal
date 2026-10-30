@@ -10,9 +10,9 @@
                 <div class="small text-muted mb-2">To <b data-to-name></b> · <span data-to-mobile></span></div>
                 <div class="tpl-list" data-wa-templates><div class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div></div></div>
                 <textarea name="text" rows="4" class="form-control mt-2" maxlength="4000" required placeholder="Type or pick a message above"></textarea>
-                <div class="small-xs text-muted mt-1"><i class="bi bi-info-circle"></i> Sent from your WhatsApp linked in the portal. Not linked? It opens WhatsApp with this message ready.</div>
+                <div class="small-xs text-muted mt-1"><i class="bi bi-info-circle"></i> @if (config('portal.whatsapp.mode') === 'gateway') Sent from your WhatsApp linked in the portal. Not linked? It opens WhatsApp with this message ready. @else Opens <b>your WhatsApp Web</b> window (right side) with this chat and message ready — press <b>Send</b>. First time: scan the QR there once. @endif</div>
             </div>
-            <div class="modal-footer border-0"><button class="btn btn-success w-100"><i class="bi bi-send-fill me-1"></i>Send</button></div>
+            <div class="modal-footer border-0"><button class="btn btn-success w-100"><i class="bi bi-whatsapp me-1"></i>{{ config('portal.whatsapp.mode') === 'gateway' ? 'Send' : 'Open in WhatsApp' }}</button></div>
         </form>
     </div>
 </div>

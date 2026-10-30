@@ -61,6 +61,9 @@ class MeetingPeopleService
         foreach (array_unique(array_filter(array_map(fn ($n) => preg_replace('/\D/', '', $n), $numbers))) as $number) {
             $ok = false;
             try {
+                if (config('portal.whatsapp.mode') !== 'gateway') {
+                    throw new RuntimeException('WhatsApp Web mode: sent from the employee\'s own WhatsApp window');
+                }
                 $res = $this->wa->call('POST', '/s/'.$this->wa->sid($sender).'/send', ['number' => $number, 'text' => $text]);
                 $ok = ($res['ok'] ?? false) === true;
             } catch (RuntimeException $e) {

@@ -10,6 +10,7 @@ class Employee extends Model
     protected $fillable = [
         'user_id', 'department_id', 'shift_id', 'manager_id',
         'designation', 'work_type', 'training_from', 'training_to', 'joining_date', 'monthly_salary',
+        'leave_count', 'leave_per_days',
     ];
 
     protected function casts(): array

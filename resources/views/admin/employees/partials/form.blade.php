@@ -145,6 +145,19 @@
                 <label class="form-label">Monthly Salary</label>
                 <input type="number" name="monthly_salary" value="{{ old('monthly_salary', $emp?->monthly_salary) }}" min="0" class="form-control">
             </div>
+            {{-- Leave rule: Earned Leave grows with the days actually worked --}}
+            <div class="col-12">
+                <label class="form-label mb-1">Leave rule</label>
+                <div class="d-flex flex-wrap align-items-center gap-2 small">
+                    <input type="number" name="leave_count" step="0.5" min="0" max="10" value="{{ old('leave_count', $emp?->leave_count !== null ? rtrim(rtrim((string) $emp->leave_count, '0'), '.') : '') }}" class="form-control form-control-sm" style="width:80px" placeholder="1">
+                    <span>leave(s) for every</span>
+                    <input type="number" name="leave_per_days" min="1" max="365" value="{{ old('leave_per_days', $emp?->leave_per_days) }}" class="form-control form-control-sm" style="width:80px" placeholder="20">
+                    <span>working days</span>
+                </div>
+                <div class="small-xs text-muted mt-1">E.g. 1 leave every 20 working days → after 40 days worked this year the employee has 2 Earned Leaves. Leave empty for the standard yearly balance.</div>
+                @error('leave_count')<div class="small text-danger">{{ $message }}</div>@enderror
+                @error('leave_per_days')<div class="small text-danger">{{ $message }}</div>@enderror
+            </div>
             @php
                 $dailyTargets = $user ? app(\App\Services\WorkScoreService::class)->baseTargets($user) : config('portal.work_score.default_targets');
                 $taskExtra = $user ? app(\App\Services\WorkAssignmentService::class)->openTargets($user) : ['leads' => 0, 'interested' => 0];

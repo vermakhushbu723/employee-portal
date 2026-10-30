@@ -62,8 +62,10 @@ class DailyReportService
         $callTargets = \App\Models\Target::whereIn('user_id', $ids)->where('period', 'daily')->where('metric', 'calls')->pluck('target_value', 'user_id');
         $live = $date->isToday() ? app(LiveStatusService::class)->rows($users)->keyBy(fn ($r) => $r['user']->id) : collect();
         $attendance = app(AttendanceService::class);
+        // Weekly / monthly attendance % and work score average (shown next to the day's work score)
+        $averages = app(TeamPerformanceService::class)->attendanceAverages($ids->all());
 
-        return $users->map(function (User $user) use ($sessions, $tasks, $calls, $matured, $comms, $meetings, $callTargets, $live, $attendance) {
+        return $users->map(function (User $user) use ($sessions, $tasks, $calls, $matured, $comms, $meetings, $callTargets, $live, $attendance, $averages) {
             $session = $sessions->get($user->id);
             $userTasks = $tasks->get($user->id, collect());
             $work = $session ? $this->score->forSession($user, $session) : null;
@@ -78,6 +80,7 @@ class DailyReportService
             return [
                 'user' => $user,
                 'session' => $session,
+                'avg' => $averages[$user->id] ?? null,
                 'work' => $work,
                 'tasks_done' => $userTasks->filter(fn ($a) => $a->status->isDone())->count(),
                 'tasks_total' => $userTasks->count(),

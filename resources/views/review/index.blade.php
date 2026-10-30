@@ -152,6 +152,7 @@
                             <a class="act-btn tone-success" href="{{ $wa }}" target="_blank" rel="noopener" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
                             @if ($lead->email)<a class="act-btn tone-primary" href="mailto:{{ $lead->email }}" title="Email"><i class="bi bi-envelope-fill"></i></a>@endif
                             <a class="act-btn tone-purple" href="{{ route($portal.'.meetings.index', ['for_lead' => $lead->id]) }}" title="Meeting"><i class="bi bi-calendar-plus-fill"></i></a>
+                            <form method="POST" action="{{ route($portal.'.team.reviewed', $lead) }}" class="d-inline">@csrf<button class="act-btn tone-warning border-0" title="Mark reviewed (TL / Manager review done)"><i class="bi bi-check2-square"></i></button></form>
                         </td>
                     </tr>
                 @empty

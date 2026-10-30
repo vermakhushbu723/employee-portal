@@ -59,6 +59,10 @@ return [
     // WhatsApp inside the portal: each user scans the QR in the side panel with their own phone.
     // The gateway (whatsapp-gateway/server.mjs) runs on the server and is started automatically when needed.
     'whatsapp' => [
+        // web     = the real web.whatsapp.com in its own docked popup window (scan once, works like on a laptop);
+        //           portal "send" buttons open that window with the chat + message ready
+        // gateway = built-in server gateway (QR inside the portal)
+        'mode' => env('WA_MODE', 'web'),
         'enabled' => (bool) env('WA_ENABLED', true),
         'socket' => env('WA_GATEWAY_SOCKET'),            // server: /home/<user>/wa-gateway/gateway.sock
         'url' => env('WA_GATEWAY_URL', 'http://127.0.0.1:3911'), // development (no socket)
@@ -198,6 +202,7 @@ Regards,
             ['heading' => 'Team'],
             ['route' => 'manager.dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
             ['route' => 'manager.team', 'icon' => 'broadcast', 'label' => 'Live Monitoring'],
+            ['route' => 'manager.team.performance', 'icon' => 'diagram-3', 'label' => 'Team Performance & Review'],
             ['route' => 'manager.tracking', 'icon' => 'geo-alt', 'label' => 'Live Tracking'],
             ['route' => 'manager.meetings.index', 'icon' => 'camera-video', 'label' => 'Meetings'],
             ['route' => 'manager.calls.index', 'icon' => 'telephone', 'label' => 'Call Log'],
@@ -224,6 +229,7 @@ Regards,
             ['heading' => 'Administration'],
             ['route' => 'admin.dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
             ['route' => 'admin.tracking', 'icon' => 'geo-alt', 'label' => 'Live Tracking'],
+            ['route' => 'admin.team.performance', 'icon' => 'diagram-3', 'label' => 'Team Hierarchy & Progress'],
             ['route' => 'admin.employees.index', 'active' => 'admin.employees.*', 'icon' => 'person-badge', 'label' => 'Employees'],
             ['route' => 'admin.roles.index', 'icon' => 'shield-check', 'label' => 'Roles'],
             // 'children' => 'departments': sidebar shows every department as a dropdown sub-menu
@@ -237,6 +243,7 @@ Regards,
             ['route' => 'admin.logout-requests.index', 'icon' => 'box-arrow-right', 'label' => 'Logout Requests'],
             ['route' => 'admin.late-requests.index', 'icon' => 'alarm', 'label' => 'Late Check-in Requests'],
             ['route' => 'admin.leaves.index', 'icon' => 'calendar2-check', 'label' => 'Leave Approvals'],
+            ['route' => 'admin.emails.index', 'icon' => 'envelope-paper', 'label' => 'Email Templates'],
             ['route' => 'admin.mail-check', 'icon' => 'envelope-check', 'label' => 'Email Check'],
             ['heading' => 'Account'],
             ['route' => 'notifications.index', 'icon' => 'megaphone', 'label' => 'Announcements'],

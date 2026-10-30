@@ -137,7 +137,7 @@
         btn.disabled = true;
         try {
             const res = await json('POST', url(target.dataset.lead, 'whatsapp'), { text: e.target.text.value });
-            if (res.link) window.open(res.link, '_blank', 'noopener');
+            if (res.link) (window.portalWA ? window.portalWA.fromLink(res.link) : window.open(res.link, '_blank', 'noopener'));
             toast('WhatsApp', res.message, !res.ok);
             modal('waModal').hide();
         } catch (err) { toast('WhatsApp', err.message, true); }

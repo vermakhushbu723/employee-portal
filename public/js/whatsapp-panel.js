@@ -6,6 +6,13 @@
     const panel = document.getElementById('waPanel');
     if (!fab || !panel) return;
 
+    // WhatsApp Web mode (default): the button opens the real web.whatsapp.com in its docked window (js/wa-web.js)
+    if (fab.dataset.waMode !== 'gateway') {
+        fab.title = 'WhatsApp Web';
+        fab.addEventListener('click', (e) => { e.preventDefault(); window.portalWA?.open(); });
+        return;
+    }
+
     const urls = JSON.parse(panel.dataset.urls);
     const KEY = 'portal:waSide';
     const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };

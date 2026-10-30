@@ -23,8 +23,33 @@ class LeaveService
 {
     public function __construct(private AuditLogger $audit) {}
 
+    /**
+     * Leave rule "X leave(s) for every Y working days" (set on the employee): this year's Earned Leave
+     * balance = full blocks of Y days worked × X. Returns the new total, or null when no rule is set.
+     */
+    public function syncAccrued(User $user): ?float
+    {
+        $emp = $user->employee;
+        if (! $emp || ! $emp->leave_per_days || $emp->leave_count === null) {
+            return null;
+        }
+        $worked = \App\Models\AttendanceSession::where('user_id', $user->id)->whereYear('work_date', now()->year)
+            ->whereNotNull('check_in_at')->count();
+        $total = floor($worked / $emp->leave_per_days) * (float) $emp->leave_count;
+        $balance = LeaveBalance::firstOrCreate(
+            ['user_id' => $user->id, 'year' => now()->year, 'leave_type' => LeaveType::Earned->value],
+            ['total' => 0, 'used' => 0],
+        );
+        if ((float) $balance->total !== (float) $total) {
+            $balance->update(['total' => $total]);
+        }
+
+        return $total;
+    }
+
     public function apply(User $user, array $data): LeaveRequest
     {
+        $this->syncAccrued($user);
         $from = Carbon::parse($data['from_date']);
         $to = Carbon::parse($data['to_date']);
         $weeklyOff = config('portal.weekly_off', [0]);
@@ -65,6 +90,7 @@ class LeaveService
     {
         $this->ensurePending($leave);
 
+        $this->syncAccrued($leave->user);
         DB::transaction(function () use ($leave, $approver) {
             $paid = $leave->leave_type === LeaveType::WorkFromHome;
 

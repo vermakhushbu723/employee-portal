@@ -18,7 +18,7 @@ class MeetingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $tab = in_array($request->query('tab'), ['upcoming', 'past', 'requests'], true) ? $request->query('tab') : 'upcoming';
+        $tab = in_array($request->query('tab'), ['upcoming', 'past', 'requests', 'emails'], true) ? $request->query('tab') : 'upcoming';
 
         $mine = fn () => Meeting::where('user_id', $user->id);
         $scopes = [
@@ -28,10 +28,15 @@ class MeetingController extends Controller
             'past' => fn ($q) => $q->whereIn('status', ['completed', 'declined', 'cancelled'])->latest('scheduled_at'),
         ];
 
+        $leadsWithEmail = Lead::ownedBy($user)->whereNotNull('email')->orderByDesc('updated_at')->limit(300)->get(['name', 'email']);
+
         return view('employee.meetings.index', [
             'tab' => $tab,
-            'counts' => collect($scopes)->map(fn ($s) => $s($mine())->count()),
-            'meetings' => $scopes[$tab]($mine())->withRoomCount()->with('creator', 'participants')->paginate(15)->withQueryString(),
+            'counts' => collect($scopes)->map(fn ($s) => $s($mine())->count())->put('emails', \App\Models\SentEmail::where('user_id', $user->id)->count()),
+            'meetings' => $scopes[$tab === 'emails' ? 'upcoming' : $tab]($mine())->withRoomCount()->with('creator', 'participants', 'lead')->paginate(15)->withQueryString(),
+            'emails' => $tab === 'emails' ? \App\Models\SentEmail::with('meeting')->where('user_id', $user->id)->latest()->paginate(20)->withQueryString() : null,
+            // Addresses already in the data (leads), offered while typing "To"
+            'emailSuggestions' => $leadsWithEmail->map(fn ($l) => ['email' => $l->email, 'label' => $l->name])->unique('email')->values()->all(),
             'live' => $mine()->where('status', 'live')->withRoomCount()->get()->first(fn ($m) => $m->hasPeopleInRoom()),
             'tags' => Meeting::TAGS,
             'leads' => Lead::ownedBy($user)->whereIn('status', ['interested', 'follow_up', 'new', 'converted'])->orderByDesc('updated_at')->limit(200)->get(['id', 'name', 'mobile', 'city', 'email']),

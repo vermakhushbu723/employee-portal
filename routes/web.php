@@ -53,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::get('notifications', [AnnouncementController::class, 'index'])->name('notifications.index');
     Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    // Send Email popup (Meetings / Email Templates page)
+    Route::post('emails/send', [\App\Http\Controllers\EmailController::class, 'send'])->middleware('throttle:20,1')->name('emails.send');
     // My E-mail IDs (up to 4, each confirmed with an OTP)
     Route::controller(\App\Http\Controllers\UserEmailController::class)->prefix('profile/emails')->name('profile.emails.')->group(function () {
         Route::post('/', 'store')->middleware('throttle:6,1')->name('store');
@@ -199,6 +201,8 @@ Route::middleware(['auth', 'role:manager,team_leader'])
         Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
         Route::post('meetings/{meeting}/review', [MeetingAdminController::class, 'review'])->whereNumber('meeting')->name('meetings.review');
         Route::get('calls', [\App\Http\Controllers\CallLogController::class, 'index'])->name('calls.index');
+        Route::get('team-performance', [\App\Http\Controllers\TeamPerformanceController::class, 'index'])->name('team.performance');
+        Route::post('team-performance/leads/{lead}/reviewed', [\App\Http\Controllers\TeamPerformanceController::class, 'reviewed'])->whereNumber('lead')->name('team.reviewed');
         Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
         Route::get('review', [LeadReviewController::class, 'index'])->name('review.index');
         Route::patch('review/leads/{lead}', [LeadReviewController::class, 'update'])->whereNumber('lead')->name('review.update');
@@ -240,6 +244,12 @@ Route::middleware(['auth', 'role:super_admin,hr'])
     ->group(function () {
         Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
         Route::get('mail-check', [Admin\MailCheckController::class, 'index'])->name('mail-check');
+        Route::controller(\App\Http\Controllers\EmailController::class)->prefix('emails')->name('emails.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('templates', 'storeTemplate')->name('templates.store');
+            Route::patch('templates/{template}', 'updateTemplate')->whereNumber('template')->name('templates.update');
+            Route::delete('templates/{template}', 'destroyTemplate')->whereNumber('template')->name('templates.destroy');
+        });
         Route::post('mail-check', [Admin\MailCheckController::class, 'send'])->middleware('throttle:5,1')->name('mail-check.send');
 
         // Live tracking, meetings and work-data corrections (same screens for admin and manager)
@@ -250,6 +260,8 @@ Route::middleware(['auth', 'role:super_admin,hr'])
         Route::get('meetings/{meeting}/room', [MeetingAdminController::class, 'room'])->whereNumber('meeting')->name('meetings.room');
         Route::post('meetings/{meeting}/review', [MeetingAdminController::class, 'review'])->whereNumber('meeting')->name('meetings.review');
         Route::get('calls', [\App\Http\Controllers\CallLogController::class, 'index'])->name('calls.index');
+        Route::get('team-performance', [\App\Http\Controllers\TeamPerformanceController::class, 'index'])->name('team.performance');
+        Route::post('team-performance/leads/{lead}/reviewed', [\App\Http\Controllers\TeamPerformanceController::class, 'reviewed'])->whereNumber('lead')->name('team.reviewed');
         Route::get('logout-requests', [LogoutRequestController::class, 'index'])->name('logout-requests.index');
         Route::get('review', [LeadReviewController::class, 'index'])->name('review.index');
         Route::patch('review/leads/{lead}', [LeadReviewController::class, 'update'])->whereNumber('lead')->name('review.update');

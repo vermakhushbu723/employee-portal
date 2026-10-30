@@ -60,6 +60,8 @@ class EmployeeRequest extends FormRequest
             // With training the joining date comes after the training end
             'joining_date' => ['nullable', 'date', Rule::when($this->filled('training_to'), 'after:training_to')],
             'monthly_salary' => ['nullable', 'numeric', 'min:0'],
+            'leave_count' => ['nullable', 'numeric', 'min:0', 'max:10', 'required_with:leave_per_days'],
+            'leave_per_days' => ['nullable', 'integer', 'min:1', 'max:365', 'required_with:leave_count'],
             'target_leads' => ['nullable', 'integer', 'min:0', 'max:1000'],
             'target_interested' => ['nullable', 'integer', 'min:0', 'max:1000'],
         ];
@@ -180,7 +182,7 @@ class EmployeeRequest extends FormRequest
     {
         return collect($this->validated())->only([
             'department_id', 'manager_id', 'designation', 'work_type',
-            'training_from', 'training_to', 'joining_date', 'monthly_salary',
+            'training_from', 'training_to', 'joining_date', 'monthly_salary', 'leave_count', 'leave_per_days',
         ])->all() + ['shift_id' => $this->resolvedShiftId()];
     }
 }

@@ -80,6 +80,7 @@
                     <th style="min-width:120px">Progress<br><span class="sub">% (Pending)</span></th>
                     <th>Battery<br><span class="sub">Location</span></th>
                     <th class="text-center">Work Score</th>
+                    <th class="text-center">Attendance Avg<br><span class="small-xs text-muted">Weekly | Monthly</span></th>
                     <th>Work Status</th>
                     <th>Action</th>
                 </tr>
@@ -151,6 +152,12 @@
                             <div class="{{ $u->location_status === 'denied' ? 'text-danger' : ($u->latitude ? 'text-success' : 'text-muted') }}"><i class="bi bi-geo-alt-fill"></i> {{ $u->location_status === 'denied' ? 'Off' : ($u->latitude ? 'On' : '--') }}</div>
                         </td>
                         <td class="text-center"><span class="score-pill tone-{{ $score >= 85 ? 'success' : ($score >= 50 ? 'warning' : 'danger') }}">{{ $score }}%</span></td>
+                        <td class="text-center small text-nowrap">
+                            @if ($av = $r['avg'] ?? null)
+                                <b class="text-{{ $av['week_att'] >= 85 ? 'success' : ($av['week_att'] >= 60 ? 'warning' : 'danger') }}">{{ $av['week_att'] }}%</b> | <b class="text-{{ $av['month_att'] >= 85 ? 'success' : ($av['month_att'] >= 60 ? 'warning' : 'danger') }}">{{ $av['month_att'] }}%</b>
+                                <div class="small-xs text-muted" title="Average work score: last 7 days | this month">Score {{ $av['week_score'] ?? '—' }}{{ $av['week_score'] !== null ? '%' : '' }} | {{ $av['month_score'] ?? '—' }}{{ $av['month_score'] !== null ? '%' : '' }}</div>
+                            @else — @endif
+                        </td>
                         <td><x-badge :tone="$wsTone">{{ $wsLabel }}</x-badge></td>
                         <td class="text-nowrap">
                             <a href="{{ route($portal.'.review.index', ['user' => $u->id, 'date' => $date->toDateString(), 'department' => $u->employee?->department_id]) }}" class="btn btn-sm btn-outline-primary">Review</a>
@@ -173,7 +180,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="19"><x-empty-state icon="people" title="No employees to show" /></td></tr>
+                    <tr><td colspan="20"><x-empty-state icon="people" title="No employees to show" /></td></tr>
                 @endforelse
             </tbody>
         </table>
